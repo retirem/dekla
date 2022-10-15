@@ -56,10 +56,9 @@ defmodule Nhf1 do
   # olyan irányra lépett, ami ütközéshez vezet, akkor üres listát ad vissza.
 
   @spec calculate_dirs(rowNumbers::[integer], colNumbers::[integer], tree::field, trees::trees) :: tent_dirs 
-
-  @spec check_summary(tree::field, rowNumbers::[integer], colNumbers::[integer], current_tents::[field], dir::dir) :: boolean()
-
-  @spec line_can_accept(line_value::integer, tents_in_line::[field]) :: boolean()
+  # Egy fához tartozó lehetséges irányok listáját adja meg, figyelembe véve, hogy ne menjen ki 
+  # a jövőbeli sátor a mezőről, illetve, hogy egy sorba és oszlopba csak akkor lehessen letenni egy sátrat, 
+  # ha van még hely
 
   defp compare(numbers, summary) do 
     for(
@@ -87,29 +86,7 @@ defmodule Nhf1 do
     )
   end
 
-  def check_sol(pd, []) do 
-    {rowNumbers, colNumbers, _} = pd
-    rows_temp = for(
-                    rowIndex <- 0..length(rowNumbers) - 1,
-                    item = Enum.at(rowNumbers, rowIndex),
-                    item != 0,
-                    do: (
-                        rowIndex + 1
-                    )
-                )
-
-    col_temp = for(
-                    colIndex <- 0..length(colNumbers) - 1,
-                    item = Enum.at(colNumbers, colIndex),
-                    item != 0,
-                    do: (
-                        colIndex + 1
-                    )
-                )
-    length(rows_temp) == 0 && length(col_temp) == 0
-  end
-
-  def check_sol(pd, ds) do
+  defp check_sol(pd, ds) do
         {rowNumbers, colNumbers, treeCells} = pd
 
         tents = for(
@@ -117,16 +94,7 @@ defmodule Nhf1 do
             tree = Enum.at(treeCells, treeIndex),
             dir = Enum.at(ds, treeIndex),
             do: (
-                cond do
-                    dir == :w ->
-                        {elem(tree, 0), elem(tree, 1) - 1}
-                    dir == :e ->
-                        {elem(tree, 0), elem(tree, 1) + 1}
-                    dir == :s ->
-                        {elem(tree, 0) + 1, elem(tree, 1)}
-                    dir == :n ->
-                        {elem(tree, 0) - 1, elem(tree, 1) }
-                end
+              create_tent(tree, dir)
             )
         )
 
@@ -143,19 +111,12 @@ defmodule Nhf1 do
                 {x1, y1} = tent;
                 {x2, y2} = tent2
                 
-                if (x1 + 1 == x2 && y1 == y2) ||  
-                (x1 - 1 == x2 && y1 == y2) ||
-                (y1 + 1 == y2 && x1 == x2) ||
-                (y1 - 1 == y2 && x1 == x2) ||
-                (x1 + 1 == x2 && y1 + 1 == y2) ||
-                (x1 + 1 == x2 && y1 - 1 == y2) ||
-                (x1 - 1 == x2 && y1 + 1 == y2) ||
-                (x1 - 1 == x2 && y1 - 1 == y2) do
+                if abs(x1 - x2) <= 1 && abs(y1 - y2) <= 1 do
                     tent
                 end
             ) 
         )
-        sanitizedTouches = touches |> Enum.uniq |> Enum.reject(&is_nil/1) #|> Enum.sort_by(&(elem(&1, 0)))
+        sanitizedTouches = touches |> Enum.uniq |> Enum.reject(&is_nil/1)
         length(badRows) == 0 && length(badCols) == 0 && length(sanitizedTouches) == 0
   end
 
@@ -192,14 +153,7 @@ defmodule Nhf1 do
             {x2, y2} = new_tent,
             do: (
                 {x1, y1} = tent;
-                if (x1 + 1 == x2 && y1 == y2) ||  
-                (x1 - 1 == x2 && y1 == y2) ||
-                (y1 + 1 == y2 && x1 == x2) ||
-                (y1 - 1 == y2 && x1 == x2) ||
-                (x1 + 1 == x2 && y1 + 1 == y2) ||
-                (x1 + 1 == x2 && y1 - 1 == y2) ||
-                (x1 - 1 == x2 && y1 + 1 == y2) ||
-                (x1 - 1 == x2 && y1 - 1 == y2) do
+                if abs(x1 - x2) <= 1 && abs(y1 - y2) <= 1 do
                     tent
                 end
             ) 
@@ -231,34 +185,6 @@ defmodule Nhf1 do
     |> Enum.uniq |> Enum.reject(fn(x) -> is_nil(x) end)
   end
 
-  defp line_can_accept(line_value, tents_in_line) do
-    if line_value < 0 do
-      true
-    else
-      if line_value == 0 do 
-        false
-      else
-        if tents_in_line + 1 <= line_value do
-          true
-        else
-          false
-        end
-      end
-    end
-  end
-
-  defp check_summary(tree, rowNumbers, colNumbers, current_tents, dir) do
-    possible_tent = create_tent(tree, dir)
-
-    row_value = Enum.at(rowNumbers, elem(possible_tent, 0) - 1)
-    col_value = Enum.at(colNumbers, elem(possible_tent, 1) - 1)
-
-    tents_in_row = Enum.filter(current_tents, fn(x) -> elem(x, 0) == elem(possible_tent, 0) end)
-    tents_in_col = Enum.filter(current_tents, fn(x) -> elem(x, 1) == elem(possible_tent, 1) end)
-
-    line_can_accept(row_value, length(tents_in_row)) && line_can_accept(col_value, length(tents_in_col))
-  end
-
   defp solve([], _rowNumbers, _colNumbers, chosen_dirs, _pure_trees, _current_tents) do
     chosen_dirs
   end
@@ -268,26 +194,21 @@ defmodule Nhf1 do
     
     dirs_for_tree = calculate_dirs(rowNumbers, colNumbers, tree, pure_trees) 
     |> Enum.filter(fn(x) -> !collision(create_tent(tree, x), current_tents) end)
-    |> Enum.filter(fn(x) -> check_summary(tree, rowNumbers, colNumbers, current_tents, x) end)
 
     for(
       dir <- dirs_for_tree,
       do: (
-        tent = create_tent(tree, dir)
-        if !collision(tent, current_tents) do
-          solve(tail, rowNumbers, colNumbers, [dir | chosen_dirs], pure_trees, [tent | current_tents])
-        else
-          []
-        end
+        tent = create_tent(tree, dir);
+        solve(tail, 
+        List.replace_at(rowNumbers, elem(tent, 0) - 1, Enum.at(rowNumbers, elem(tent, 0) - 1) - 1),
+        List.replace_at(colNumbers, elem(tent, 1) - 1, Enum.at(colNumbers, elem(tent, 1) - 1) - 1),
+        [dir | chosen_dirs], pure_trees, [tent | current_tents])
       )
     )
   end
 
   def satrak(pd) do
     {rowNumbers, colNumbers, trees} = pd
-
     List.flatten(solve(trees, rowNumbers, colNumbers, [], trees, [])) |> Enum.reverse |> Enum.chunk_every(length(trees)) |> Enum.filter(fn(x) -> check_sol(pd, x) end)
   end
 end
-
-#IO.inspect Nhf1.satrak {[3, 3, 2, 3, 4, 3, 3, 1, 7, 1, 3, 2, 2, 4, 2],[2, 2, 1, 2, 4, 2, 4, 1, 2, 4, 0, 2, 1, 3, 1, 3, 2, 1, 2, 4],[{1, 3},{1, 6},{1, 9},{1, 14},{1, 19},{3, 1},{3, 11},{3, 16},{4, 5},{4, 13},{4, 20},{5, 11},{5, 16},{5, 19},{6, 7},{6, 13},{6, 18},{7, 6},{7, 10},{7, 12},{7, 20},{8, 2},{8, 5},{8, 9},{9, 16},{9, 19},{10, 4},{10, 6},{10, 14},{10, 20},{11, 3},{11, 11},{11, 17},{12, 5},{12, 19},{13, 3},{13, 7},{13, 9},{14, 2},{14, 8},{14, 9},{15, 4},{15, 16}]}
