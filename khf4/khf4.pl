@@ -1,41 +1,69 @@
-satrak_mx(RowNum-ColNum, Trees, Dirs, boolMx) :- 
-    [] = CurrentTents,
-    [] = Rows,
+satrak_mx(RowNum-ColNum, Trees, Dirs, Rows) :- 
     create_every_tent(RowNum, ColNum, Trees, Dirs, CurrentTents),
-    create_matrice(RowNum, ColNum, CurrentTents, Rows).    
+    no_collision(CurrentTents),
+    create_matrice(RowNum, ColNum, CurrentTents, Rows),!.    
 
 create_matrice(RowNum, ColNum, CurrentTents, Rows) :-
-    build_rows(RowNum, ColNum, 0, CurrentTents, Rows).
+    build_rows(RowNum, ColNum, 1, CurrentTents, Rows).
 
 build_rows(MaxRow, MaxCol, CurrentRow, CurrentTents, Rows) :-
-    build_cols(MaxCol, CurrentRow, 0, CurrentTents, Row),
-    build_rows(MaxRow, MaxCol, CurrentRow + 1, CurrentTents, [Row|Rows]).
+    (CurrentRow =< MaxRow,
+    build_cols(MaxCol, CurrentRow, 1, CurrentTents, Row),
+    Rows = [Row|NewRows],
+    TempRow is CurrentRow + 1,
+    build_rows(MaxRow, MaxCol, TempRow, CurrentTents, NewRows))
+    ;
+    (
+    	Rows = []
+    ).
 
-build_rows(MaxRow, _, CurrentRow, _, _) :-
-    CurrentRow == MaxRow, !.
+build_cols(MaxCol, CurrentRow, CurrentCol, [], Row) :-
+    (CurrentCol =< MaxCol,
+    Row = ['0'|NewElements],
+    TempCol is CurrentCol + 1,
+    build_cols(MaxCol, CurrentRow, TempCol, [], NewElements))
+    ;
+    (
+    	Row = []
+    ).
 
 build_cols(MaxCol, CurrentRow, CurrentCol, CurrentTents, Row) :-
-    (memberchk(CurrentRow-CurrentCol, CurrentTents) , 
-        build_cols(MaxCol, CurrentRow, CurrentCol + 1, CurrentTents, ['1'|Row]));
-    (\+memberchk(CurrentRow-CurrentCol, CurrentTents) , 
-        build_cols(MaxCol, CurrentRow, CurrentCol + 1, CurrentTents, ['0'|Row])).
-    
-build_cols(MaxCol, CurrentCol, _, _, _) :-
-    CurrentCol == MaxCol, !.
+    (CurrentCol =< MaxCol,
+    (memberchk(CurrentRow-CurrentCol, CurrentTents) ->  
+    	Row = ['1'|NewElements]
+    ;   
+    	Row = ['0'|NewElements]
+    ),
+    TempCol is CurrentCol + 1,
+    build_cols(MaxCol, CurrentRow, TempCol, CurrentTents, NewElements))
+    ;
+    (CurrentCol > MaxCol, 
+    	Row = []
+    ).
 
 create_every_tent(RowNum, ColNum, [HeadTree|TailTrees], [HeadDir|TailDirs], CurrentTents) :-
-    placeable_tent(RowNum, ColNum, HeadTree, HeadDir, CurrentTents),
-    create_every_tent(RowNum, ColNum, TailTrees, TailDirs, CurrentTents).
+    create_tent(HeadTree, HeadDir, Tent),
+    placeable_tent(RowNum, ColNum, Tent),
+    CurrentTents = [Tent|NewCurrentTents],
+    create_every_tent(RowNum, ColNum, TailTrees, TailDirs, NewCurrentTents).
 
 create_every_tent(_, _, [], [], CurrentTents) :-
-    CurrentTents == CurrentTents.
+    CurrentTents = [].
 
-placeable_tent(RowNum, ColNum, TreeRow-TreeCol, Dir, CurrentTents) :- 
-    create_tent(TreeRow, TreeCol, Dir, Tent),
-    tent_inside(RowNum, ColNum, Tent),
-    \+memberchk(Tent, CurrentTents).
+placeable_tent(RowNum, ColNum, Tent) :- 
+    tent_inside(RowNum, ColNum, Tent).
 
-create_tent(TreeRow, TreeCol, Dir, Tent) :-
+no_collision([HeadTent|TailTents]) :-
+    \+memberchk(HeadTent, TailTents),
+    no_collision(TailTents).
+
+no_collision([]) :-
+    true.
+
+no_collision([_|[]]) :-
+    true.
+
+create_tent(TreeRow-TreeCol, Dir, Tent) :-
     (Dir == n , NewRow is TreeRow - 1 , NewRow-TreeCol = Tent);
     (Dir == s , NewRow is TreeRow + 1 , NewRow-TreeCol = Tent);
     (Dir == w , NewCol is TreeCol - 1 , TreeRow-NewCol = Tent);
