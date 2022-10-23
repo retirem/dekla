@@ -19,7 +19,7 @@ build_rows(MaxRow, MaxCol, CurrentRow, CurrentTents, Rows) :-
 
 build_cols(MaxCol, CurrentRow, CurrentCol, [], Row) :-
     (CurrentCol =< MaxCol,
-    Row = ['0'|NewElements],
+    Row = [0|NewElements],
     TempCol is CurrentCol + 1,
     build_cols(MaxCol, CurrentRow, TempCol, [], NewElements))
     ;
@@ -30,9 +30,9 @@ build_cols(MaxCol, CurrentRow, CurrentCol, [], Row) :-
 build_cols(MaxCol, CurrentRow, CurrentCol, CurrentTents, Row) :-
     (CurrentCol =< MaxCol,
     (memberchk(CurrentRow-CurrentCol, CurrentTents) ->  
-    	Row = ['1'|NewElements]
+    	Row = [1|NewElements]
     ;   
-    	Row = ['0'|NewElements]
+    	Row = [0|NewElements]
     ),
     TempCol is CurrentCol + 1,
     build_cols(MaxCol, CurrentRow, TempCol, CurrentTents, NewElements))
