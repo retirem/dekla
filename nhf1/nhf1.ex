@@ -258,6 +258,9 @@ defmodule Nhf1 do
     )
   end
 
+  # Ha nincsenek fák, nincsenek irányok
+  def satrak({_rows, _cols, []}), do: []
+  
   # Előállítja a kapott puzzle_desc-hez a megoldásokat.
   def satrak(pd) do
     {rowNumbers, colNumbers, trees} = pd
