@@ -21,7 +21,7 @@ check_dirs_for_tree(RowNum-ColNum, [AllDirHead|AllDirTail], Tree, Trees, Current
     	CurrentDirs = [AllDirHead|NewCurrentDirs],
         check_dirs_for_tree(RowNum-ColNum, AllDirTail, Tree, Trees, NewCurrentDirs)
     ;   
-    	CurrentDirs = [_|NewCurrentDirs],
+    	CurrentDirs = NewCurrentDirs,
     	check_dirs_for_tree(RowNum-ColNum, AllDirTail, Tree, Trees, NewCurrentDirs)
     ).
 
