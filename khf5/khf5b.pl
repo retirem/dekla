@@ -5,8 +5,12 @@ sator_szukites(Trees, SpecialTreeIndex, TreesDirLists, ShrunkLists) :-
     nth0(ValidIndex, Trees, Tree),
     [Dir|_] = DirsForIndexedTree,
     create_tent(Tree, Dir, Tent),
-    ShrunkLists = NewList,
-    magic(Tent, Tree, Trees, TreesDirLists, NewList).
+    magic(Tent, Tree, Trees, TreesDirLists, NewList),
+    (\+memberchk([], NewList) -> 
+        ShrunkLists = NewList
+    ;
+        ShrunkLists = []
+    ).
 
 sator_szukites(_, _, [], ShrunkList) :-
     ShrunkList = [].
