@@ -12,7 +12,7 @@ sator_szukites(_, _, [], ShrunkList) :-
     ShrunkList = [].
 
 magic(Tent, TreesDirLists, ShrunkLists) :-
-    ShrunkLists = Coords,
+    ShrunkLists = [Tent|Coords],
     collect_coords(Tent, Coords, 0).
     /*ShrunkLists = ReturnedLists,
     shrunk_lists(Coords, TreesDirLists, ReturnedLists).*/
