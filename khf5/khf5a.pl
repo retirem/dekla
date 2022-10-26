@@ -1,5 +1,6 @@
 iranylistak(RowCol, Trees, DirectionList) :-
-    create_dir_lists(RowCol, Trees, DirectionList).
+    create_dir_lists(RowCol, Trees, DirectionList);
+    DirectionList = [].
 
 iranylistak(_, [], DirectionList) :-
     DirectionList = [].
@@ -9,6 +10,8 @@ create_dir_lists(RowCol, Trees, DirectionList) :-
     check_dirs_for_tree(RowCol, [n,s,w,e], HeadTree, Trees,  ListForTree),
     sort(ListForTree, Sorted),
     DirectionList = [Sorted|NewDirList],
+    length(NewDirList, Length),
+    Length =\= 0,
     create_dir_lists(RowCol, TailTree, NewDirList).
 
 create_dir_lists(_, [], NewDirList) :-
