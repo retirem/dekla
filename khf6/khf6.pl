@@ -1,8 +1,7 @@
 osszeg_szukites(Trees, SumCondition, TreeDirs, ShrunkDirs) :-
     get_sure_trees(Trees, SumCondition, TreeDirs, Sures),
     get_perhaps_trees(Trees, SumCondition, TreeDirs, Perhapses),
-    ShrunkDirs = ReturnShrunks,
-    shrunk(Trees, Sures, Perhapses, SumCondition, TreeDirs, ReturnShrunks).
+    shrunk(Trees, Sures, Perhapses, SumCondition, TreeDirs, ShrunkDirs).
 
 shrunk(Trees, SureTrees, PerhapsTrees, SumCondition, OriginalDirList, Shrunks) :-
     length(SureTrees, SureLength),
@@ -42,8 +41,7 @@ get_no_correct_dirs_col([_-HeadTentCol|TailTents], [HeadOriginalDir|TailOriginal
         Dirs = [HeadOriginalDir|Ret],
         get_no_correct_dirs_col(TailTents, TailOriginalDirs, ColCount, Ret)
     ;
-        Dirs = Ret,
-        get_no_correct_dirs_col(TailTents, TailOriginalDirs, ColCount, Ret)
+        get_no_correct_dirs_col(TailTents, TailOriginalDirs, ColCount, Dirs)
     ).
 
 get_no_correct_dirs_col([], [], _, Dirs) :-
@@ -54,21 +52,18 @@ get_no_correct_dirs_row([HeadTentRow-_|TailTents], [HeadOriginalDir|TailOriginal
         Dirs = [HeadOriginalDir|Ret],
         get_no_correct_dirs_row(TailTents, TailOriginalDirs, RowCount, Ret)
     ;
-        Dirs = Ret,
-        get_no_correct_dirs_row(TailTents, TailOriginalDirs, RowCount, Ret)
+        get_no_correct_dirs_row(TailTents, TailOriginalDirs, RowCount, Dirs)
     ).
 
 get_no_correct_dirs_row([], [], _, Dirs) :-
     Dirs = [].
-
 
 get_all_correct_dirs_col([_-HeadTentCol|TailTents], [HeadOriginalDir|TailOriginalDirs], ColCount, Dirs) :-
     (HeadTentCol == ColCount,
         Dirs = [HeadOriginalDir|Ret],
         get_all_correct_dirs_col(TailTents, TailOriginalDirs, ColCount, Ret)
     ;
-        Dirs = Ret,
-        get_all_correct_dirs_col(TailTents, TailOriginalDirs, ColCount, Ret)
+        get_all_correct_dirs_col(TailTents, TailOriginalDirs, ColCount, Dirs)
     ).
 
 get_all_correct_dirs_col([], [], _, Dirs) :-
@@ -79,8 +74,7 @@ get_all_correct_dirs_row([HeadTentRow-_|TailTents], [HeadOriginalDir|TailOrigina
         Dirs = [HeadOriginalDir|Ret],
         get_all_correct_dirs_row(TailTents, TailOriginalDirs, RowCount, Ret)
     ;
-        Dirs = Ret,
-        get_all_correct_dirs_row(TailTents, TailOriginalDirs, RowCount, Ret)
+        get_all_correct_dirs_row(TailTents, TailOriginalDirs, RowCount, Dirs)
     ).
 
 get_all_correct_dirs_row([], [], _, Dirs) :-
@@ -122,8 +116,6 @@ no_perhapses_row(_, [], Dirs, _, ShrunkDirs) :-
 no_perhapses_row([], _, _, _, ShrunkDirs) :-
     ShrunkDirs = [].
 
-
-
 all_perhapses_col([HeadTree|TailTrees], PerhapsTrees, [OriginalHeadDirs|OriginalTailDirs], ColCount, ShrunkDirs) :-
     [HeadPerhapsTree|TailPerhapsTrees] = PerhapsTrees,
     (HeadTree == HeadPerhapsTree ->
@@ -160,8 +152,6 @@ all_perhapses_row(_, [], Dirs, _, ShrunkDirs) :-
 all_perhapses_row([], _, _, _, ShrunkDirs) :-
     ShrunkDirs = [].
 
-
-
 no_collision_tent_col([_-HeadTentCol|TailTents], ColCount) :-
     HeadTentCol \= ColCount,
     no_collision_tent_col(TailTents, ColCount).
@@ -176,8 +166,6 @@ no_collision_tent_row([HeadTentRow-_|TailTents], RowCount) :-
 no_collision_tent_row([], _) :-
     true.
 
-
-
 create_tents(Tree, [HeadDir|TailDirs], Tents) :-
     create_tent(Tree, HeadDir, Tent),
     Tents = [Tent|Ret],
@@ -186,17 +174,12 @@ create_tents(Tree, [HeadDir|TailDirs], Tents) :-
 create_tents(_, [], Tents) :-
     Tents = [].
 
-
-
-/* PERHAPS */
-
 get_perhaps_trees([HeadTree|TailTrees], sor(RowCount, RowNum), [HeadTreeDirs|TailTreeDirs], Perhapses) :-
     (check_tree_perhaps_row(HeadTree, RowCount, HeadTreeDirs) ->
         Perhapses = [HeadTree|Ret],
         get_perhaps_trees(TailTrees, sor(RowCount, RowNum), TailTreeDirs, Ret)
     ;
-        Perhapses = Ret,
-        get_perhaps_trees(TailTrees, sor(RowCount, RowNum), TailTreeDirs, Ret)
+        get_perhaps_trees(TailTrees, sor(RowCount, RowNum), TailTreeDirs, Perhapses)
     ).
 
 get_perhaps_trees([HeadTree|TailTrees], oszl(ColCount, ColNum), [HeadTreeDirs|TailTreeDirs], Perhapses) :-
@@ -204,8 +187,7 @@ get_perhaps_trees([HeadTree|TailTrees], oszl(ColCount, ColNum), [HeadTreeDirs|Ta
         Perhapses = [HeadTree|Ret],
         get_perhaps_trees(TailTrees, oszl(ColCount, ColNum), TailTreeDirs, Ret)
     ;
-        Perhapses = Ret,
-        get_perhaps_trees(TailTrees, oszl(ColCount, ColNum), TailTreeDirs, Ret)
+        get_perhaps_trees(TailTrees, oszl(ColCount, ColNum), TailTreeDirs, Perhapses)
     ).
 
 get_perhaps_trees([], _, [], Perhapses) :-
@@ -221,18 +203,12 @@ check_tree_perhaps_row(Tree, RowCount, Dirs) :-
     create_tents(Tree, Dirs, Tents),
     \+no_collision_tent_row(Tents, RowCount).
 
-
-
-
-/* SURE */
-
 get_sure_trees([HeadTree|TailTrees], oszl(ColCount, ColNum), [HeadTreeDirs|TailTreeDirs], Sures) :-
     (check_tree_sure_col(HeadTree, ColCount, HeadTreeDirs) ->
         Sures = [HeadTree|Ret],
         get_sure_trees(TailTrees, oszl(ColCount, ColNum), TailTreeDirs, Ret)
     ;
-        Sures = Ret,
-        get_sure_trees(TailTrees, oszl(ColCount, ColNum), TailTreeDirs, Ret)
+        get_sure_trees(TailTrees, oszl(ColCount, ColNum), TailTreeDirs, Sures)
     ).
 
 get_sure_trees([HeadTree|TailTrees], sor(RowCount, RowNum), [HeadTreeDirs|TailTreeDirs], Sures) :-
@@ -240,8 +216,7 @@ get_sure_trees([HeadTree|TailTrees], sor(RowCount, RowNum), [HeadTreeDirs|TailTr
         Sures = [HeadTree|Ret],
         get_sure_trees(TailTrees, sor(RowCount, RowNum), TailTreeDirs, Ret)
     ;
-        Sures = Ret,
-        get_sure_trees(TailTrees, sor(RowCount, RowNum), TailTreeDirs, Ret)
+        get_sure_trees(TailTrees, sor(RowCount, RowNum), TailTreeDirs, Sures)
     ).
 
 get_sure_trees([], _, [], Sures) :-
