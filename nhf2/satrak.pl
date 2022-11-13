@@ -7,7 +7,7 @@ satrak(RowNumbers, ColNumbers, Trees, Solution) :-
     solve(Trees, TreeLength, ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Solution).
 
 solve(Trees, TreeLength, ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Solution) :- 
-    sub_solve(Trees, TreeLength, ShrunkedDirs, ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, 0, TempSolution, Solution).
+    sub_solve(Trees, TreeLength, ShrunkedDirs, ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, 0, _, Solution).
 
 sub_solve(Trees, TreeLength, [_|TailDirs], ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Index, TempSolution, Solution) :-
     nth0(Index, ShrunkedDirs, SubDirs),
@@ -20,8 +20,11 @@ sub_solve(Trees, TreeLength, [_|TailDirs], ShrunkedDirs, RowNumbers, RowLength, 
         multi_solve(Trees, TreeLength, SubDirs, ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Index, TempSolution, Solution)
     ).
 
-multi_solve(Trees, TreeLength, [HeadSub|TailSub], ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Index, TempSolution, Solution) :-
-    replace_at(ShrunkedDirs, Index, HeadSub, NewShrunked),
+sub_solve(_, _, [], _, _, _, _, _, _, TempSolution, Solution) :-
+    Solution = [TempSolution|[]].
+
+multi_solve(Trees, TreeLength, [HeadSub|_], ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Index, TempSolution, Solution) :-
+    replace_at(ShrunkedDirs, 0, Index, HeadSub, NewShrunked),
     sublist_from(NewShrunked, Index, 0, NewSub),
     sub_solve(Trees, TreeLength, NewSub, NewShrunked, RowNumbers, RowLength, ColNumbers, ColLength, Index, TempSolution, Solution).
 
@@ -51,9 +54,6 @@ sublist_from([Head|Tail], IndexFrom, Index, SubList) :-
 
 sublist_from([], _, _, SubList) :-
     SubList = [].
-
-sub_solve(_, _, [], _, _, _, _, _, TempSolution, Solution) :-
-    Solution = [TempSolution|[]].
 
 do_shrunks(Trees, TreeLength, DirectionLists, RowNumbers, RowLength, ColNumbers, ColLength, ShrunkedList) :-
     shrunk_trees(Trees, TreeLength, DirectionLists, ShrunkedDirs),
@@ -88,7 +88,7 @@ do_shrunk_row(Trees, DirectionLists, RowNumbers, RowLength, Index, ShrunkedDirs)
 
 shrunk_trees(Trees, TreeLength, DirectionsLists, Return) :-
     do_shrunk_dir(Trees, 1, TreeLength, DirectionsLists, Shrunked),
-    (DirectionsLists /= Shrunked -> 
+    (DirectionsLists \= Shrunked -> 
         shrunk_trees(Trees, TreeLength, Shrunked, Return)
     ;
         Return = Shrunked
