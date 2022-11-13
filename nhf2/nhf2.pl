@@ -4,19 +4,59 @@ satrak(RowNumbers, ColNumbers, Trees, Solution) :-
     iranylistak(RowLength-ColLength, Trees, DirectionsLists),
     length(Trees, TreeLength),
     do_shrunks(Trees, TreeLength, DirectionsLists, RowNumbers, RowLength, ColNumbers, ColLength, ShrunkedDirs),
-    solve(Trees, ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Solution).
+    solve(Trees, TreeLength, ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Solution).
 
-solve(Trees, ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Solution) :-
+solve(Trees, TreeLength, ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Solution) :- 
+    sub_solve(Trees, TreeLength, ShrunkedDirs, ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, 0, TempSolution, Solution).
 
+sub_solve(Trees, TreeLength, [_|TailDirs], ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Index, TempSolution, Solution) :-
+    nth0(Index, ShrunkedDirs, SubDirs),
+    length(SubDirs, Length),
+    (Length == 1 -> 
+        TempSolution = [SubDirs|Ret],
+        TempIndex is Index + 1,
+        sub_solve(Trees, TreeLength, TailDirs, ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, TempIndex, Ret, Solution)
+    ;
+        multi_solve(Trees, TreeLength, SubDirs, ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Index, TempSolution, Solution)
+    ).
 
-sub_solve([])
+multi_solve(Trees, TreeLength, [HeadSub|TailSub], ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Index, TempSolution, Solution) :-
+    replace_at(ShrunkedDirs, Index, HeadSub, NewShrunked),
+    sublist_from(NewShrunked, Index, 0, NewSub),
+    sub_solve(Trees, TreeLength, NewSub, NewShrunked, RowNumbers, RowLength, ColNumbers, ColLength, Index, TempSolution, Solution).
 
+multi_solve(_, _, [], _, _, _, _, _, _, _, _) :- false.
 
+replace_at([Head|Tail], CurrentIndex, Index, Value, NewList) :-
+    TempIndex is CurrentIndex + 1,
+    (CurrentIndex == Index ->
+        NewList = [Head|Ret],
+        replace_at(Tail, TempIndex, Index, Value, Ret)
+    ;
+        replace_at(Tail, TempIndex, Index, Value, NewList)
+    ).
 
+replace_at([], _, _, _, NewList) :-
+    NewList = [].
 
+/* Count starts with index 0 */ 
+sublist_from([Head|Tail], IndexFrom, Index, SubList) :-
+    TempIndex is Index + 1,
+    ( Index >= IndexFrom ->
+        SubList = [Head|Ret],
+        sublist_from(Tail, IndexFrom, TempIndex, Ret)
+    ;
+        sublist_from(Tail, IndexFrom, TempIndex, SubList)
+    ).
+
+sublist_from([], _, _, SubList) :-
+    SubList = [].
+
+sub_solve(_, _, [], _, _, _, _, _, TempSolution, Solution) :-
+    Solution = [TempSolution|[]].
 
 do_shrunks(Trees, TreeLength, DirectionLists, RowNumbers, RowLength, ColNumbers, ColLength, ShrunkedList) :-
-    shrunk_trees(Trees, TreeLength, DirectionsLists, ShrunkedDirs),
+    shrunk_trees(Trees, TreeLength, DirectionLists, ShrunkedDirs),
     shrunk_sums(Trees, RowNumbers, RowLength, ColNumbers, ColLength, ShrunkedDirs, ShrunkedList).
 
 shrunk_sums(Trees, RowNumbers, RowLength, ColNumbers, ColLength, DirectionLists, SumShrunkedDirs) :-
@@ -54,7 +94,7 @@ shrunk_trees(Trees, TreeLength, DirectionsLists, Return) :-
         Return = Shrunked
     ).
 
-do_shrunk_dir(Trees, Index, Length, DirectionsLists, Ret) :-
+do_shrunk_dir(Trees, Index, Length, DirectionLists, Ret) :-
     (Index =< Length -> 
         sator_szukites(Trees, Index, DirectionLists, Shrunked),
         TempIndex is Index + 1,
