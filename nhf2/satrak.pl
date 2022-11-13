@@ -1,109 +1,92 @@
-satrak(RowNumbers, ColNumbers, Trees, Solution) :-
+:- use_module(library(lists), [nth0/3, nth0/4]).
+
+satrak(satrak(RowNumbers, ColNumbers, Trees), Solution) :-
     length(RowNumbers, RowLength),
     length(ColNumbers, ColLength),
     iranylistak(RowLength-ColLength, Trees, DirectionsLists),
-    length(Trees, TreeLength),
-    do_shrunks(Trees, TreeLength, DirectionsLists, RowNumbers, RowLength, ColNumbers, ColLength, ShrunkedDirs),
-    solve(Trees, TreeLength, ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Solution).
+   	do_shrunks(Trees, DirectionsLists, RowNumbers, ColNumbers, ShrunkedDirs),
+    solve(Trees, ShrunkedDirs, RowNumbers, ColNumbers, Return),
+    flatten(Return, Solution).
+    %check_sol(Trees, TempSolution, Solution).
 
-solve(Trees, TreeLength, ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Solution) :- 
-    sub_solve(Trees, TreeLength, ShrunkedDirs, ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, 0, _, Solution).
+%check_sol([HeadTree|TailTree], [HeadDir], Solution) :-
+    
 
-sub_solve(Trees, TreeLength, [_|TailDirs], ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Index, TempSolution, Solution) :-
-    nth0(Index, ShrunkedDirs, SubDirs),
-    length(SubDirs, Length),
+solve(Trees, ShrunkedDirs, RowNumbers, ColNumbers, Solution) :- 
+    sub_solve(Trees, ShrunkedDirs, ShrunkedDirs, RowNumbers, ColNumbers, 0, Solution).
+
+sub_solve(Trees, [HeadDirs|TailDirs], ShrunkedDirs, RowNumbers, ColNumbers, ValidIndex, Solution) :-
+    length(HeadDirs, Length),
+    NextValidIndex is ValidIndex + 1,
     (Length == 1 -> 
-        TempSolution = [SubDirs|Ret],
-        TempIndex is Index + 1,
-        sub_solve(Trees, TreeLength, TailDirs, ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, TempIndex, Ret, Solution)
+        Solution = [HeadDirs|Ret],
+        sub_solve(Trees, TailDirs, ShrunkedDirs, RowNumbers, ColNumbers, NextValidIndex, Ret)
     ;
-        multi_solve(Trees, TreeLength, SubDirs, ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Index, TempSolution, Solution)
+        member(DirElement, HeadDirs),
+        nth0(ValidIndex, ShrunkedDirs, _, Rest),
+        nth0(ValidIndex, NewShrunked, [DirElement], Rest),
+        do_shrunks(Trees, NewShrunked, RowNumbers, ColNumbers, ShrunkedAgain),
+        length(Pref, ValidIndex),
+        append(Pref, SubShrunked, ShrunkedAgain),
+    	sub_solve(Trees, SubShrunked, ShrunkedAgain, RowNumbers, ColNumbers, ValidIndex, Solution)
     ).
 
-sub_solve(_, _, [], _, _, _, _, _, _, TempSolution, Solution) :-
-    Solution = [TempSolution|[]].
+sub_solve(_, [], _, _, _, _, Solution) :-
+    Solution = [].
 
-multi_solve(Trees, TreeLength, [HeadSub|_], ShrunkedDirs, RowNumbers, RowLength, ColNumbers, ColLength, Index, TempSolution, Solution) :-
-    replace_at(ShrunkedDirs, 0, Index, HeadSub, NewShrunked),
-    sublist_from(NewShrunked, Index, 0, NewSub),
-    sub_solve(Trees, TreeLength, NewSub, NewShrunked, RowNumbers, RowLength, ColNumbers, ColLength, Index, TempSolution, Solution).
+do_shrunks(Trees, DirectionLists, RowNumbers, ColNumbers, ShrunkedList) :-
+    shrunk_trees(Trees, DirectionLists, ShrunkedDirs),
+    shrunk_sums(Trees, RowNumbers, ColNumbers, ShrunkedDirs, ShrunkedList).
 
-multi_solve(_, _, [], _, _, _, _, _, _, _, _) :- false.
+shrunk_sums(Trees, RowNumbers, ColNumbers, DirectionLists, SumShrunkedDirs) :-
+    do_shrunk_row(Trees, DirectionLists, RowNumbers, 1, TempShrunkedLists),
+    do_shrunk_col(Trees, TempShrunkedLists, ColNumbers, 1, SumShrunkedDirs).
 
-replace_at([Head|Tail], CurrentIndex, Index, Value, NewList) :-
-    TempIndex is CurrentIndex + 1,
-    (CurrentIndex == Index ->
-        NewList = [Head|Ret],
-        replace_at(Tail, TempIndex, Index, Value, Ret)
-    ;
-        replace_at(Tail, TempIndex, Index, Value, NewList)
+do_shrunk_col(Trees, DirectionLists, [HeadColNum|TailColNums], Index, ShrunkedDirs) :-
+    NextIndex is Index + 1,
+    (HeadColNum >= 0 ->
+    	osszeg_szukites(Trees, oszl(Index, HeadColNum), DirectionLists, Shrunked),
+        Shrunked \= [],
+        do_shrunk_col(Trees, Shrunked, TailColNums, NextIndex, ShrunkedDirs)
+    ;   
+    	do_shrunk_col(Trees, DirectionLists, TailColNums, NextIndex, ShrunkedDirs)
     ).
 
-replace_at([], _, _, _, NewList) :-
-    NewList = [].
+do_shrunk_col(_,  ShrunkedList, [], _, ShrunkedDirs) :-
+    ShrunkedDirs = ShrunkedList.
 
-/* Count starts with index 0 */ 
-sublist_from([Head|Tail], IndexFrom, Index, SubList) :-
-    TempIndex is Index + 1,
-    ( Index >= IndexFrom ->
-        SubList = [Head|Ret],
-        sublist_from(Tail, IndexFrom, TempIndex, Ret)
-    ;
-        sublist_from(Tail, IndexFrom, TempIndex, SubList)
+do_shrunk_row(Trees, DirectionLists, [HeadRowNum|TailRowNums], Index, ShrunkedDirs) :-
+    NextIndex is Index + 1,
+    (HeadRowNum >= 0 ->  
+    	osszeg_szukites(Trees, sor(Index, HeadRowNum), DirectionLists, Shrunked),
+        Shrunked \= [],
+    	do_shrunk_row(Trees, Shrunked, TailRowNums, NextIndex, ShrunkedDirs)
+    ;   
+    	do_shrunk_row(Trees, DirectionLists, TailRowNums, NextIndex, ShrunkedDirs)
     ).
 
-sublist_from([], _, _, SubList) :-
-    SubList = [].
-
-do_shrunks(Trees, TreeLength, DirectionLists, RowNumbers, RowLength, ColNumbers, ColLength, ShrunkedList) :-
-    shrunk_trees(Trees, TreeLength, DirectionLists, ShrunkedDirs),
-    shrunk_sums(Trees, RowNumbers, RowLength, ColNumbers, ColLength, ShrunkedDirs, ShrunkedList).
-
-shrunk_sums(Trees, RowNumbers, RowLength, ColNumbers, ColLength, DirectionLists, SumShrunkedDirs) :-
-    do_shrunk_row(Trees, DirectionLists, RowNumbers, RowLength, 1, TempShrunkedLists),
-    do_shrunk_col(Trees, TempShrunkedLists, ColNumbers, ColLength, 1, SumShrunkedDirs).
-
-do_shrunk_col(Trees, DirectionLists, ColNumbers, ColLength, Index, ShrunkedDirs) :-
-    (Index =< ColLength ->
-        ValidIndex is Index - 1,
-        nth0(ValidIndex, ColNumbers, Db),
-        osszeg_szukites(Trees, oszl(Index, Db), DirectionLists, Shrunked),
-        TempIndex is Index + 1,
-        do_shrunk_col(Trees, Shrunked, ColNumbers, ColLength, TempIndex, ShrunkedDirs)
-    ;
-        ShrunkedDirs = DirectionLists
-    ).
-
-do_shrunk_row(Trees, DirectionLists, RowNumbers, RowLength, Index, ShrunkedDirs) :-
-    (Index =< RowLength -> 
-        ValidIndex is Index - 1,
-        nth0(ValidIndex, RowNumbers, Db),
-        osszeg_szukites(Trees, sor(Index, Db), DirectionLists, Shrunked),
-        TempIndex is Index + 1,
-        do_shrunk_row(Trees, Shrunked, RowNumbers, RowLength, TempIndex, ShrunkedDirs)
-    ;
-        ShrunkedDirs = DirectionLists
-    ).
-
-
-shrunk_trees(Trees, TreeLength, DirectionsLists, Return) :-
-    do_shrunk_dir(Trees, 1, TreeLength, DirectionsLists, Shrunked),
+do_shrunk_row(_, ShrunkedList, [], _, ShrunkedDirs) :-
+    ShrunkedDirs = ShrunkedList.
+    
+shrunk_trees(Trees, DirectionsLists, Return) :-
+    do_shrunk_dir(Trees, Trees, 1, DirectionsLists, Shrunked),
     (DirectionsLists \= Shrunked -> 
-        shrunk_trees(Trees, TreeLength, Shrunked, Return)
+        shrunk_trees(Trees, Shrunked, Return)
     ;
         Return = Shrunked
     ).
 
-do_shrunk_dir(Trees, Index, Length, DirectionLists, Ret) :-
-    (Index =< Length -> 
-        sator_szukites(Trees, Index, DirectionLists, Shrunked),
-        TempIndex is Index + 1,
-        do_shrunk_dir(Trees, TempIndex, Length, Shrunked, Ret)
+do_shrunk_dir(Trees, [_|TailTrees], Index, DirectionLists, Return) :-
+    NextIndex is Index + 1,
+    ((sator_szukites(Trees, Index, DirectionLists, Shrunked)) ->  
+    	Shrunked \= [],
+    	do_shrunk_dir(Trees, TailTrees, NextIndex, Shrunked, Return)
     ;
-        Ret = DirectionLists
+    	do_shrunk_dir(Trees, TailTrees, NextIndex, DirectionLists, Return)
     ).
 
-
+do_shrunk_dir(_, [], _, FinalShrunkedList, ReturnList) :-
+    ReturnList = FinalShrunkedList.
 
 /* ------------------------- LEGACY ---------------------------- */
 
@@ -142,17 +125,8 @@ check_dirs_for_tree(RowNum-ColNum, [AllDirHead|AllDirTail], Tree, Trees, Current
 check_dirs_for_tree(_, [], _, _, NewCurrentDirs) :-
     NewCurrentDirs = [].
 
-create_tent(TreeRow-TreeCol, Dir, Tent) :-
-    (Dir == n , NewRow is TreeRow - 1 , NewRow-TreeCol = Tent);
-    (Dir == s , NewRow is TreeRow + 1 , NewRow-TreeCol = Tent);
-    (Dir == w , NewCol is TreeCol - 1 , TreeRow-NewCol = Tent);
-    (Dir == e , NewCol is TreeCol + 1 , TreeRow-NewCol = Tent).
-
 tent_inside(RowNum, ColNum, TentRow-TentCol) :-
     (TentRow > 0 , TentRow =< RowNum , TentCol > 0 , TentCol =< ColNum).
-
-
-
 
 sator_szukites(Trees, SpecialTreeIndex, TreesDirLists, ShrunkLists) :-
     ValidIndex is SpecialTreeIndex - 1,
@@ -227,13 +201,6 @@ coord_by_index(TentX-TentY, Index, Coord) :-
 check_nth_element(DirList) :-
     length(DirList, Length),
     Length == 1.
-
-
-
-
-
-
-
 
 osszeg_szukites(Trees, SumCondition, TreeDirs, ShrunkDirs) :-
     get_sure_trees(Trees, SumCondition, TreeDirs, Sures),
@@ -486,3 +453,13 @@ tents_are_right_row(Tree, RowCount, [HeadDir|TailDirs]) :-
 
 tents_are_right_row(_, _, []) :-
     true.
+
+create_tent(TreeRow-TreeCol, Dir, Tent) :-
+    (Dir == n , NewRow is TreeRow - 1 , NewRow-TreeCol = Tent);
+    (Dir == s , NewRow is TreeRow + 1 , NewRow-TreeCol = Tent);
+    (Dir == w , NewCol is TreeCol - 1 , TreeRow-NewCol = Tent);
+    (Dir == e , NewCol is TreeCol + 1 , TreeRow-NewCol = Tent).
+
+flatten([], []).
+flatten([[H]|T], [H|Tail]) :-
+    flatten(T, Tail).
