@@ -13,27 +13,47 @@ solve(Trees, ShrunkedDirs, RowNumbers, ColNumbers, Solution) :-
 
 sub_solve(Trees, [HeadDirs|TailDirs], ShrunkedDirs, RowNumbers, ColNumbers, ValidIndex, Solution) :-
     length(HeadDirs, Length),
-    NextValidIndex is ValidIndex + 1,
+    NextValidIndex is ValidIndex + 1, 
     (Length == 1 -> 
-        Solution = [HeadDirs|Ret],
+    Solution = [HeadDirs|Ret],
         sub_solve(Trees, TailDirs, ShrunkedDirs, RowNumbers, ColNumbers, NextValidIndex, Ret)
     ;
-        member(DirElement, HeadDirs),
+    	member(DirElement, HeadDirs),
         nth0(ValidIndex, ShrunkedDirs, _, Rest),
-        nth0(ValidIndex, NewShrunked, [DirElement], Rest),
-        do_shrunks(Trees, NewShrunked, RowNumbers, ColNumbers, ShrunkedAgain),
+        nth0(ValidIndex, NewShrunked, [DirElement], Rest),  
+    	do_shrunks(Trees, NewShrunked, RowNumbers, ColNumbers, ShrunkedAgain),
         length(Pref, ValidIndex),
         append(Pref, SubShrunked, ShrunkedAgain),
-    	sub_solve(Trees, SubShrunked, ShrunkedAgain, RowNumbers, ColNumbers, ValidIndex, Solution)
-    ).
+        sub_solve(Trees, SubShrunked, ShrunkedAgain, RowNumbers, ColNumbers, ValidIndex, Solution)
+	).
 
 sub_solve(_, [], _, _, _, _, Solution) :-
     Solution = [].
 
+/*check_one_element([]) :- true.
+
+check_one_element([[_]|TailDirList]) :-
+    check_one_element(TailDirList).*/
+
 do_shrunks(Trees, DirectionLists, RowNumbers, ColNumbers, ShrunkedList) :-
+    /*(do_shrunk_row(Trees, DirectionLists, RowNumbers, 1, TempShrunkedLists) ->  
+    	(shrunk_trees(Trees, TempShrunkedLists, ShrunkedDirs) ->
+        
+        
+        )
+    ;   
+    	shrunk_trees(Trees, TempShrunkedLists, ShrunkedDirs),
+    	do_shrunk_col(Trees, ShrunkedDirs, ColNumbers, 1, ShrunkedList)
+    ).*/
     do_shrunk_row(Trees, DirectionLists, RowNumbers, 1, TempShrunkedLists),
     shrunk_trees(Trees, TempShrunkedLists, ShrunkedDirs),
     do_shrunk_col(Trees, ShrunkedDirs, ColNumbers, 1, ShrunkedList).
+    /*shrunk_trees(Trees, DirectionLists, ShrunkedDirs),
+    (do_shrunk_row(Trees, ShrunkedDirs, RowNumbers, 1, TempShrunkedLists) -> 
+    	do_shrunk_col(Trees, TempShrunkedLists, ColNumbers, 1, ShrunkedList)
+    ;   
+    	do_shrunk_col(Trees, ShrunkedDirs, ColNumbers, 1, ShrunkedList)
+    ).*/
 
 do_shrunk_col(Trees, DirectionLists, [HeadColNum|TailColNums], Index, ShrunkedDirs) :-
     NextIndex is Index + 1,
@@ -100,39 +120,38 @@ iranylistak(RowCol, Trees, DirectionList) :-
 iranylistak(_, [], DirectionList) :-
     DirectionList = [].
 
-create_dir_lists(RowCol, Trees, CurrentTrees, DirectionList) :-
-    [HeadTree|TailTree] = CurrentTrees,
-    check_dirs_for_tree(RowCol, [n,s,w,e], HeadTree, Trees,  ListForTree),
+create_dir_lists(RowCol, Trees, [HCurrentTree|TCurrentTrees], DirectionList) :-
+    dirlist_single_tree(RowCol, [n,s,w,e], HCurrentTree, Trees,  ListForTree),
     sort(ListForTree, Sorted),
     DirectionList = [Sorted|NewDirList],
-    create_dir_lists(RowCol, Trees, TailTree, NewDirList).
+    create_dir_lists(RowCol, Trees, TCurrentTrees, NewDirList).
 
 create_dir_lists(_, _, [], NewDirList) :-
     NewDirList = [].
 
-check_dirs_for_tree(RowNum-ColNum, [AllDirHead|AllDirTail], Tree, Trees, CurrentDirs) :-
-    (create_tent(Tree, AllDirHead, Tent),
-    tent_inside(RowNum, ColNum, Tent),
-    \+memberchk(Tent, Trees) ->  
-    	CurrentDirs = [AllDirHead|NewCurrentDirs],
-        check_dirs_for_tree(RowNum-ColNum, AllDirTail, Tree, Trees, NewCurrentDirs)
+dirlist_single_tree(RowNum-ColNum, [HDir|TDirs], Tree, Trees, CurrentDirs) :-
+    create_tent(Tree, HDir, Tent),
+    ((tent_inside(RowNum, ColNum, Tent), \+memberchk(Tent, Trees)) ->  
+    	CurrentDirs = [HDir|NewCurrentDirs],
+        dirlist_single_tree(RowNum-ColNum, TDirs, Tree, Trees, NewCurrentDirs)
     ;   
-    	CurrentDirs = NewCurrentDirs,
-    	check_dirs_for_tree(RowNum-ColNum, AllDirTail, Tree, Trees, NewCurrentDirs)
+    	dirlist_single_tree(RowNum-ColNum, TDirs, Tree, Trees, CurrentDirs)
     ).
 
-check_dirs_for_tree(_, [], _, _, NewCurrentDirs) :-
+dirlist_single_tree(_, [], _, _, NewCurrentDirs) :-
     NewCurrentDirs = [].
 
 tent_inside(RowNum, ColNum, TentRow-TentCol) :-
     (TentRow > 0 , TentRow =< RowNum , TentCol > 0 , TentCol =< ColNum).
 
+/* sator_szukites */
+
 sator_szukites(Trees, SpecialTreeIndex, TreesDirLists, ShrunkLists) :-
     ValidIndex is SpecialTreeIndex - 1,
-    nth0(ValidIndex, TreesDirLists, DirsForIndexedTree),
-    check_nth_element(DirsForIndexedTree),
+    nth0(ValidIndex, TreesDirLists, DirForIndexedTree),
+    check_nth_element(DirForIndexedTree),
     nth0(ValidIndex, Trees, Tree),
-    [Dir|_] = DirsForIndexedTree,
+    [Dir|_] = DirForIndexedTree,
     create_tent(Tree, Dir, Tent),
     magic(Tent, Tree, Trees, TreesDirLists, NewList),
     (\+memberchk([], NewList) -> 
@@ -141,8 +160,10 @@ sator_szukites(Trees, SpecialTreeIndex, TreesDirLists, ShrunkLists) :-
         ShrunkLists = []
     ).
 
-sator_szukites(_, _, [], ShrunkList) :-
-    ShrunkList = [].
+check_nth_element([_X|[]]).
+
+%check_nth_element(List) :-
+%    length(List, Length), Length == 1.
 
 magic(Tent, Tree, Trees, TreesDirLists, ShrunkLists) :-
     collect_coords(Tent, Coords, 0),
@@ -197,9 +218,7 @@ coord_by_index(TentX-TentY, Index, Coord) :-
     (Index == 6 , NewX is TentX - 1 , NewY is TentY + 1 , Coord = NewX-NewY); /* corner top right */
     (Index == 7 , NewX is TentX - 1 , NewY is TentY - 1 , Coord = NewX-NewY). /* corner top left */
 
-check_nth_element(DirList) :-
-    length(DirList, Length),
-    Length == 1.
+/* osszeg_szukites */
 
 osszeg_szukites(Trees, SumCondition, TreeDirs, ShrunkDirs) :-
     get_sure_trees(Trees, SumCondition, TreeDirs, Sures),
@@ -453,12 +472,21 @@ tents_are_right_row(Tree, RowCount, [HeadDir|TailDirs]) :-
 tents_are_right_row(_, _, []) :-
     true.
 
-create_tent(TreeRow-TreeCol, Dir, Tent) :-
+/*create_tent(TreeRow-TreeCol, Dir, Tent) :-
     (Dir == n , NewRow is TreeRow - 1 , NewRow-TreeCol = Tent);
     (Dir == s , NewRow is TreeRow + 1 , NewRow-TreeCol = Tent);
     (Dir == w , NewCol is TreeCol - 1 , TreeRow-NewCol = Tent);
-    (Dir == e , NewCol is TreeCol + 1 , TreeRow-NewCol = Tent).
+    (Dir == e , NewCol is TreeCol + 1 , TreeRow-NewCol = Tent).*/
+
+create_tent(TreeRow-TreeCol, n, Tent) :- NewRow is TreeRow - 1, NewRow-TreeCol = Tent.
+create_tent(TreeRow-TreeCol, s, Tent) :- NewRow is TreeRow + 1, NewRow-TreeCol = Tent.
+create_tent(TreeRow-TreeCol, e, Tent) :- NewCol is TreeCol + 1, TreeRow-NewCol = Tent.
+create_tent(TreeRow-TreeCol, w, Tent) :- NewCol is TreeCol - 1, TreeRow-NewCol = Tent.
 
 flatten([], []).
 flatten([[H]|T], [H|Tail]) :-
     flatten(T, Tail).
+
+
+
+
