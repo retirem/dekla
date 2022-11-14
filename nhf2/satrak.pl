@@ -31,12 +31,9 @@ sub_solve(_, [], _, _, _, _, Solution) :-
     Solution = [].
 
 do_shrunks(Trees, DirectionLists, RowNumbers, ColNumbers, ShrunkedList) :-
-    shrunk_trees(Trees, DirectionLists, ShrunkedDirs),
-    shrunk_sums(Trees, RowNumbers, ColNumbers, ShrunkedDirs, ShrunkedList).
-
-shrunk_sums(Trees, RowNumbers, ColNumbers, DirectionLists, SumShrunkedDirs) :-
     do_shrunk_row(Trees, DirectionLists, RowNumbers, 1, TempShrunkedLists),
-    do_shrunk_col(Trees, TempShrunkedLists, ColNumbers, 1, SumShrunkedDirs).
+    shrunk_trees(Trees, TempShrunkedLists, ShrunkedDirs),
+    do_shrunk_col(Trees, ShrunkedDirs, ColNumbers, 1, ShrunkedList).
 
 do_shrunk_col(Trees, DirectionLists, [HeadColNum|TailColNums], Index, ShrunkedDirs) :-
     NextIndex is Index + 1,
