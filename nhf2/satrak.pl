@@ -6,11 +6,7 @@ satrak(satrak(RowNumbers, ColNumbers, Trees), Solution) :-
     iranylistak(RowLength-ColLength, Trees, DirectionsLists),
    	do_shrunks(Trees, DirectionsLists, RowNumbers, ColNumbers, ShrunkedDirs),
     solve(Trees, ShrunkedDirs, RowNumbers, ColNumbers, Return),
-    flatten(Return, Solution).
-    %check_sol(Trees, TempSolution, Solution).
-
-%check_sol([HeadTree|TailTree], [HeadDir], Solution) :-
-    
+    flatten(Return, Solution).    
 
 solve(Trees, ShrunkedDirs, RowNumbers, ColNumbers, Solution) :- 
     sub_solve(Trees, ShrunkedDirs, ShrunkedDirs, RowNumbers, ColNumbers, 0, Solution).
@@ -44,10 +40,13 @@ shrunk_sums(Trees, RowNumbers, ColNumbers, DirectionLists, SumShrunkedDirs) :-
 
 do_shrunk_col(Trees, DirectionLists, [HeadColNum|TailColNums], Index, ShrunkedDirs) :-
     NextIndex is Index + 1,
-    (HeadColNum >= 0 ->
-    	osszeg_szukites(Trees, oszl(Index, HeadColNum), DirectionLists, Shrunked),
-        Shrunked \= [],
-        do_shrunk_col(Trees, Shrunked, TailColNums, NextIndex, ShrunkedDirs)
+    (HeadColNum >= 0 ->  
+    	(osszeg_szukites(Trees, oszl(Index, HeadColNum), DirectionLists, Shrunked) ->
+        	Shrunked \= [],
+        	do_shrunk_col(Trees, Shrunked, TailColNums, NextIndex, ShrunkedDirs)
+        ;   
+        	do_shrunk_col(Trees, DirectionLists, TailColNums, NextIndex, ShrunkedDirs)
+        )
     ;   
     	do_shrunk_col(Trees, DirectionLists, TailColNums, NextIndex, ShrunkedDirs)
     ).
@@ -58,9 +57,12 @@ do_shrunk_col(_,  ShrunkedList, [], _, ShrunkedDirs) :-
 do_shrunk_row(Trees, DirectionLists, [HeadRowNum|TailRowNums], Index, ShrunkedDirs) :-
     NextIndex is Index + 1,
     (HeadRowNum >= 0 ->  
-    	osszeg_szukites(Trees, sor(Index, HeadRowNum), DirectionLists, Shrunked),
-        Shrunked \= [],
-    	do_shrunk_row(Trees, Shrunked, TailRowNums, NextIndex, ShrunkedDirs)
+    	(osszeg_szukites(Trees, sor(Index, HeadRowNum), DirectionLists, Shrunked) ->  
+        	Shrunked \= [],
+    		do_shrunk_row(Trees, Shrunked, TailRowNums, NextIndex, ShrunkedDirs)
+    	;   
+    		do_shrunk_row(Trees, DirectionLists, TailRowNums, NextIndex, ShrunkedDirs)
+    	)
     ;   
     	do_shrunk_row(Trees, DirectionLists, TailRowNums, NextIndex, ShrunkedDirs)
     ).
@@ -78,7 +80,7 @@ shrunk_trees(Trees, DirectionsLists, Return) :-
 
 do_shrunk_dir(Trees, [_|TailTrees], Index, DirectionLists, Return) :-
     NextIndex is Index + 1,
-    ((sator_szukites(Trees, Index, DirectionLists, Shrunked)) ->  
+    (sator_szukites(Trees, Index, DirectionLists, Shrunked) ->  
     	Shrunked \= [],
     	do_shrunk_dir(Trees, TailTrees, NextIndex, Shrunked, Return)
     ;
