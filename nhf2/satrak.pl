@@ -8,9 +8,14 @@ satrak(satrak(RowNumbers, ColNumbers, Trees), Solution) :-
     solve(Trees, ShrunkedDirs, RowNumbers, ColNumbers, Return),
     flatten(Return, Solution).    
 
+% Előkészíti a feladvány megoldását 
 solve(Trees, ShrunkedDirs, RowNumbers, ColNumbers, Solution) :- 
     sub_solve(Trees, ShrunkedDirs, ShrunkedDirs, RowNumbers, ColNumbers, 0, Solution).
 
+% A feldavány megoldásának motorja. Ha egyelemű az adott iránylista, akkor hozzávesszük a megoldáshoz, 
+% majd rekurzívan továbbmegyünk, ha több elemű, akkor mindegyiket kiválasztva és lerögzítve az adott indexű helyen
+% rekurzívan továbbmegyünk
+sub_solve(_, [], _, _, _, _, Solution) :- Solution = [].
 sub_solve(Trees, [HeadDirs|TailDirs], ShrunkedDirs, RowNumbers, ColNumbers, ValidIndex, Solution) :-
     length(HeadDirs, Length),
     NextValidIndex is ValidIndex + 1, 
@@ -27,13 +32,14 @@ sub_solve(Trees, [HeadDirs|TailDirs], ShrunkedDirs, RowNumbers, ColNumbers, Vali
         sub_solve(Trees, SubShrunked, ShrunkedAgain, RowNumbers, ColNumbers, ValidIndex, Solution)
 	).
 
-sub_solve(_, [], _, _, _, _, Solution) :- Solution = [].
-
+% A sor-, sátor- és oszlop szűkítések végrehajtása ebben a sorrendben
 do_shrunks(Trees, DirectionLists, RowNumbers, ColNumbers, ShrunkedList) :-
     do_shrunk_row(Trees, DirectionLists, RowNumbers, 1, TempShrunkedLists),
     shrunk_trees(Trees, TempShrunkedLists, ShrunkedDirs),
     do_shrunk_col(Trees, ShrunkedDirs, ColNumbers, 1, ShrunkedList).
 
+% A bemenő fák, iránylisták, oszlop kritériumok és index alapján az oszlop szűkítés elvégzése
+do_shrunk_col(_,  ShrunkedList, [], _, ShrunkedDirs) :- ShrunkedDirs = ShrunkedList.
 do_shrunk_col(Trees, DirectionLists, [HeadColNum|TailColNums], Index, ShrunkedDirs) :-
     NextIndex is Index + 1,
     (HeadColNum >= 0 ->  
@@ -47,8 +53,8 @@ do_shrunk_col(Trees, DirectionLists, [HeadColNum|TailColNums], Index, ShrunkedDi
     	do_shrunk_col(Trees, DirectionLists, TailColNums, NextIndex, ShrunkedDirs)
     ).
 
-do_shrunk_col(_,  ShrunkedList, [], _, ShrunkedDirs) :- ShrunkedDirs = ShrunkedList.
-
+% A bemenő fák, iránylisták, sor kritériumok és index alapján az sor szűkítés elvégzése
+do_shrunk_row(_, ShrunkedList, [], _, ShrunkedDirs) :- ShrunkedDirs = ShrunkedList.
 do_shrunk_row(Trees, DirectionLists, [HeadRowNum|TailRowNums], Index, ShrunkedDirs) :-
     NextIndex is Index + 1,
     (HeadRowNum >= 0 ->  
@@ -61,9 +67,8 @@ do_shrunk_row(Trees, DirectionLists, [HeadRowNum|TailRowNums], Index, ShrunkedDi
     ;   
     	do_shrunk_row(Trees, DirectionLists, TailRowNums, NextIndex, ShrunkedDirs)
     ).
-
-do_shrunk_row(_, ShrunkedList, [], _, ShrunkedDirs) :- ShrunkedDirs = ShrunkedList.
     
+% Szűkítés sátrak szerint rekurzívan, egészen addig, amíg lehet szűkíteni
 shrunk_trees(Trees, DirectionsLists, Return) :-
     do_shrunk_dir(Trees, Trees, 1, DirectionsLists, Shrunked),
     (DirectionsLists \= Shrunked -> 
@@ -72,6 +77,9 @@ shrunk_trees(Trees, DirectionsLists, Return) :-
         Return = Shrunked
     ).
 
+% A bemenő fák, hátralevő fák, jelenlegi fa indexe 1-essel kezdve és iránylisták alapján minden fára elvégzi
+% a sátor szűkítést
+do_shrunk_dir(_, [], _, FinalShrunkedList, ReturnList) :- ReturnList = FinalShrunkedList.
 do_shrunk_dir(Trees, [_|TailTrees], Index, DirectionLists, Return) :-
     NextIndex is Index + 1,
     (sator_szukites(Trees, Index, DirectionLists, Shrunked) ->  
@@ -81,10 +89,9 @@ do_shrunk_dir(Trees, [_|TailTrees], Index, DirectionLists, Return) :-
     	do_shrunk_dir(Trees, TailTrees, NextIndex, DirectionLists, Return)
     ).
 
-do_shrunk_dir(_, [], _, FinalShrunkedList, ReturnList) :- ReturnList = FinalShrunkedList.
-
 /* ------------------------- LEGACY ---------------------------- */
 
+iranylistak(_, [], DirectionList) :- DirectionList = [].
 iranylistak(RowCol, Trees, DirectionList) :-
     create_dir_lists(RowCol, Trees, Trees, TempList),
     (\+memberchk([], TempList) ->  
@@ -93,28 +100,28 @@ iranylistak(RowCol, Trees, DirectionList) :-
     	DirectionList = []
     ).
 
-iranylistak(_, [], DirectionList) :- DirectionList = [].
-
+% Létrehozza a fákhoz tartozó iránylistákat
+create_dir_lists(_, _, [], NewDirList) :- NewDirList = [].
 create_dir_lists(RowCol, Trees, [HCurrentTree|TCurrentTrees], DirectionList) :-
     dirlist_single_tree(RowCol, [n,s,w,e], HCurrentTree, Trees,  ListForTree),
     sort(ListForTree, Sorted),
     DirectionList = [Sorted|NewDirList],
     create_dir_lists(RowCol, Trees, TCurrentTrees, NewDirList).
 
-create_dir_lists(_, _, [], NewDirList) :- NewDirList = [].
-
-dirlist_single_tree(RowNum-ColNum, [HDir|TDirs], Tree, Trees, CurrentDirs) :-
+% Kiválasztja az adott fához azokat az irányokat, hogy az azokkal képzett sátrak nem lógnak ki
+% a mezőről és nem esnek egybe másik fával
+dirlist_single_tree(_, [], _, _, NewCurrentDirs) :- NewCurrentDirs = [].
+dirlist_single_tree(RowCol, [HDir|TDirs], Tree, Trees, CurrentDirs) :-
     create_tent(Tree, HDir, Tent),
-    ((tent_inside(RowNum, ColNum, Tent), \+memberchk(Tent, Trees)) ->  
+    ((tent_inside(RowCol, Tent), \+memberchk(Tent, Trees)) ->  
     	CurrentDirs = [HDir|NewCurrentDirs],
-        dirlist_single_tree(RowNum-ColNum, TDirs, Tree, Trees, NewCurrentDirs)
+        dirlist_single_tree(RowCol, TDirs, Tree, Trees, NewCurrentDirs)
     ;   
-    	dirlist_single_tree(RowNum-ColNum, TDirs, Tree, Trees, CurrentDirs)
+    	dirlist_single_tree(RowCol, TDirs, Tree, Trees, CurrentDirs)
     ).
 
-dirlist_single_tree(_, [], _, _, NewCurrentDirs) :- NewCurrentDirs = [].
-
-tent_inside(RowNum, ColNum, TentRow-TentCol) :-
+% A kapott sor és oszlop szám alapján ellenőrzi, hogy a bemenő sátor a mezőn helyezkedik-e el
+tent_inside(RowNum-ColNum, TentRow-TentCol) :-
     (TentRow > 0 , TentRow =< RowNum , TentCol > 0 , TentCol =< ColNum).
 
 /* sator_szukites */
@@ -133,13 +140,18 @@ sator_szukites(Trees, SpecialTreeIndex, TreesDirLists, ShrunkLists) :-
         ShrunkLists = []
     ).
 
+% Ellenőrzi, hogy a kapott lista egyelemű-e
 check_length_one([_X|[]]).
 
+% Előkészíti a sátor szűkítést
 magic(Tent, Tree, Trees, TreesDirLists, ShrunkLists) :-
     collect_coords(Tent, Coords, 0),
     CheckingCoords = [Tent|Coords],
     shrunk_lists(CheckingCoords, Tent, Tree, Trees, TreesDirLists, ShrunkLists).
 
+% A bemenő koordináta halmaz, sátor, kijelölt fa, fák, iránylisták alapján szűkíti a 
+% megfelelő fák iránylistáit
+shrunk_lists(_, _, _, [], [], ReturnedLists) :- ReturnedLists = [].
 shrunk_lists(CheckingCoords, Tent, SelectedTree, [HeadTree|TailTrees], [HeadTreeDirsList|TailTreeDirsLists], ReturnedLists) :-
     (below_current(Tent, HeadTree) -> 
     	ReturnedLists = [HeadTreeDirsList|TailTreeDirsLists]
@@ -159,12 +171,14 @@ shrunk_lists(CheckingCoords, Tent, SelectedTree, [HeadTree|TailTrees], [HeadTree
         )
 	).
 
-shrunk_lists(_, _, _, [], [], ReturnedLists) :- ReturnedLists = [].
-
-below_current(STreetX-_, CTreeX-_) :-
-    HorizontalDist is CTreeX - STreetX,
+% Ellenőrzi, hogy a bemenő kijelölt fától elég messze van-e a bemenő aktuális fa,
+% mivel így már az aktuális fával nem kell szűkítést számolni
+below_current(STreeX-_, CTreeX-_) :-
+    HorizontalDist is CTreeX - STreeX,
     HorizontalDist >= 3.
 
+% Ellenőrzi, hogy a bemenő sátor olyan közel van-e a bemenő fához, hogy érdemes-e a fával 
+% szűkítést számolni
 in_distance(STentX-STentY, CTreeX-CTreeY) :-
     HorizontalDist is STentX-CTreeX,
     VerticalDist is STentY-CTreeY,
@@ -172,6 +186,8 @@ in_distance(STentX-STentY, CTreeX-CTreeY) :-
     VerticalAbs is abs(VerticalDist),
     ((HorizontalAbs =< 2 , VerticalAbs =< 1) ; (HorizontalAbs =< 1 , VerticalAbs =< 2)), !.
 
+% A bemenő sátor körülötti koordináta halmaz, fa és iránylista alapján szűkíti a fa iránylistáját
+new_dirs_tree(_, _, [], NewDirList) :- NewDirList = [].
 new_dirs_tree(CheckingCoords, Tree, [HeadDir|TailDirs], DirList) :-
     create_tent(Tree, HeadDir, Tent),
     (memberchk(Tent, CheckingCoords) ->
@@ -181,16 +197,16 @@ new_dirs_tree(CheckingCoords, Tree, [HeadDir|TailDirs], DirList) :-
         new_dirs_tree(CheckingCoords, Tree, TailDirs, NewDirList)
     ).
 
-new_dirs_tree(_, _, [], NewDirList) :- NewDirList = [].
-
+% A bemenő sátor alapján összegyűjti a kürölötte lévő cellák koordinátáit
+collect_coords(_, NewCoords, 8) :- NewCoords = [].
 collect_coords(Tent, Coords, Index) :-
     coord_by_index(Tent, Index, Coord),
     NextIndex is Index + 1,
     Coords = [Coord|NewCoords],
     collect_coords(Tent, NewCoords, NextIndex).
 
-collect_coords(_, NewCoords, 8) :- NewCoords = [].
-
+% A kapott koordináták és index alapján visszaad egy új koordináta párost.
+% A sátor körülötti cellák meghatározásához
 coord_by_index(X-Y, 0, NewX-Y) :- NewX is X + 1. /* middle bottom */
 coord_by_index(X-Y, 1, NewX-Y) :- NewX is X - 1. /* middle top */
 coord_by_index(X-Y, 2, X-NewY) :- NewY is Y + 1. /* middle right */
@@ -207,11 +223,15 @@ osszeg_szukites(Trees, LineLimit, TreeDirs, ShrunkDirs) :-
     get_perhaps_trees(Trees, LineLimit, TreeDirs, Perhapses),
     shrunk(Trees, Sures, Perhapses, LineLimit, TreeDirs, ShrunkDirs),!.
 
+% A bemenp fák, 'biztos' fa list, 'eseteg' fa list, oszlop/sor kritérium és iránylisták 
+% segítségével előkészíti az összegek alapján való döntést
 shrunk(Trees, SureTrees, PerhapsTrees, LineLimit, OriginalDirList, Shrunks) :-
     length(SureTrees, SureLength),
     length(PerhapsTrees, PerhapsLength),
     decide_on_length(Trees, SureLength, PerhapsLength, PerhapsTrees, OriginalDirList, LineLimit, Shrunks).
 
+% A bemenő fák, 'biztos' fa össze, 'esetleg' fa összes, esetleg fák, iránylisták és oszlop/sor kritérium alapján 
+% elvégzi az összegszűkítést
 decide_on_length(Trees, SureLength, PerhapsLength, PerhapsTrees, OriginalDirList, sor(Index, Db), Shrunks) :-
     TempSum is SureLength + PerhapsLength,
     (TempSum < Db, Shrunks = []);
@@ -234,6 +254,10 @@ decide_on_length(Trees, SureLength, PerhapsLength, PerhapsTrees, OriginalDirList
     );
     (SureLength > Db , Shrunks = []).
 
+% A bemenő sátrak, iránylisták és oszlop/sor kritérium alapján előállítja azokat az irányokat,
+% amivel a sátrak nem tesznek eleget az oszlop/sor feltételnek
+get_no_correct_dirs([], [], _, Dirs) :- Dirs = [].
+
 get_no_correct_dirs([HTentRow-_|TTents], [HOriginalDir|TOriginalDirs], sor(Index, _), Dirs) :-
     (HTentRow \= Index,
         Dirs = [HOriginalDir|Return],
@@ -250,7 +274,9 @@ get_no_correct_dirs([_-HTentCol|TTents], [HOriginalDir|TOriginalDirs], oszl(Inde
         get_no_correct_dirs(TTents, TOriginalDirs, oszl(Index, _), Dirs)
     ).
 
-get_no_correct_dirs([], [], _, Dirs) :- Dirs = [].
+% A bemenő sátrak, iránylisták és oszlop/sor kritérium alapján előállítja azokat az irányokat,
+% amivel a sátrak eleget tesznek az oszlop/sor feltételnek
+get_all_correct_dirs([], [], _, Dirs) :- Dirs = [].
 
 get_all_correct_dirs([HTentRow-_|TTents], [HOriginalDir|TOriginalDirs], sor(Index, _), Dirs) :-
     (HTentRow == Index ->
@@ -268,8 +294,10 @@ get_all_correct_dirs([_-HTentCol|TTents], [HOriginalDir|TOriginalDirs], oszl(Ind
         get_all_correct_dirs(TTents, TOriginalDirs, oszl(Index, _), Dirs)
     ).
 
-get_all_correct_dirs([], [], _, Dirs) :- Dirs = [].
-
+% A bemenő fák, 'esetleg' fák, fákhoz tartozó iránylisták és oszlop/sor kritérium alapján előállítja
+% azt a szűkített listát, amibe egyik 'esetleg' fa sem tartozik bele
+no_perhapses(_, [], Dirs, _, ShrunkDirs) :- ShrunkDirs = Dirs.
+no_perhapses([], _, _, _, ShrunkDirs) :- ShrunkDirs = [].
 no_perhapses([HTree|TTrees], [HPerhapsTree|TPerhapsTrees], [HOriginalDir|TOriginalDirs], LineLimit, ShrunkDirs) :-
     (HTree == HPerhapsTree ->
         create_tents(HTree, HOriginalDir, Tents),
@@ -281,10 +309,10 @@ no_perhapses([HTree|TTrees], [HPerhapsTree|TPerhapsTrees], [HOriginalDir|TOrigin
         no_perhapses(TTrees, [HPerhapsTree|TPerhapsTrees], TOriginalDirs, LineLimit, Return)
     ).
 
-no_perhapses(_, [], Dirs, _, ShrunkDirs) :- ShrunkDirs = Dirs.
-
-no_perhapses([], _, _, _, ShrunkDirs) :- ShrunkDirs = [].
-
+% A bemenő fák, 'esetleg' fák, fákhoz tartozó iránylisták és oszlop/sor kritérium alapján előállítja
+% azt a szűkített listát, amibe minden 'esetleg' fa beletartoztik
+all_perhapses(_, [], Dirs, _, ShrunkDirs) :- ShrunkDirs = Dirs.
+all_perhapses([], _, _, _, ShrunkDirs) :- ShrunkDirs = [].
 all_perhapses([HTree|TTrees], [HPerhapsTree|TPerhapsTrees], [HOriginalDirs|TOriginalDirs], LineLimit, ShrunkDirs) :-
     (HTree == HPerhapsTree ->
         create_tents(HTree, HOriginalDirs, Tents),
@@ -296,26 +324,27 @@ all_perhapses([HTree|TTrees], [HPerhapsTree|TPerhapsTrees], [HOriginalDirs|TOrig
         all_perhapses(TTrees, TPerhapsTrees, TOriginalDirs, LineLimit, Return)
     ).
 
-all_perhapses(_, [], Dirs, _, ShrunkDirs) :- ShrunkDirs = Dirs.
+% A bemenő sátrak és oszlop/sor kritérium alapján ellenőrzi, hogy van-e olyan sátor, ami
+% nem helyezkedik el a kritérium szerinti sorban/oszlopban
+tent_is_out([], _) :- true.
 
-all_perhapses([], _, _, _, ShrunkDirs) :- ShrunkDirs = [].
-
-no_collision_tent([HTentRow-_|TailTents], sor(Index, _)) :-
+tent_is_out([HTentRow-_|TailTents], sor(Index, _)) :-
     HTentRow \= Index,
-    no_collision_tent(TailTents, sor(Index, _)).
+    tent_is_out(TailTents, sor(Index, _)).
 
-no_collision_tent([_-HTentCol|TailTents], oszl(Index, _)) :-
+tent_is_out([_-HTentCol|TailTents], oszl(Index, _)) :-
     HTentCol \= Index,
-    no_collision_tent(TailTents, oszl(Index, _)).
+    tent_is_out(TailTents, oszl(Index, _)).
 
-no_collision_tent([], _) :- true.
-
+% A bemenő fa és ahhoz tartozó iránylist alapján előállítja a fához tartozó sátrakat
+create_tents(_, [], Tents) :- Tents = [].
 create_tents(Tree, [HeadDir|TailDirs], Tents) :-
     create_tent(Tree, HeadDir, Tent),
     Tents = [Tent|Ret],
     create_tents(Tree, TailDirs, Ret).
 
-create_tents(_, [], Tents) :- Tents = [].
+% A bemenő fák, oszlop/sor kritérium, és iránylisták alapján összegyűjti az összes 'esetleg' fát
+get_perhaps_trees([], _, [], Perhapses) :- Perhapses = [].
 
 get_perhaps_trees([HTreeRow-HTreeCol|TailTrees], sor(Index, Db), [HeadTreeDirs|TailTreeDirs], Perhapses) :-
     VerticalDist is HTreeRow - Index,
@@ -344,14 +373,16 @@ get_perhaps_trees([HTreeRow-HTreeCol|TailTrees], oszl(Index, Db), [HeadTreeDirs|
     ;
         get_perhaps_trees(TailTrees, oszl(Index, Db), TailTreeDirs, Perhapses)
     ).
-
-
-get_perhaps_trees([], _, [], Perhapses) :- Perhapses = [].
     
+% A bemenő fa, oszlop/sor kritérium és fához tartozó irányok alapján ellenőrzi, hogy 
+% a fa 'esetleg' fa-e
 check_tree_perhaps(Tree, LineLimit, Dirs) :-
     \+check_tree_for_sure(Tree, LineLimit, Dirs),
     create_tents(Tree, Dirs, Tents),
-    \+no_collision_tent(Tents, LineLimit).
+    \+tent_is_out(Tents, LineLimit).
+
+% A bemenő fák, oszlop/sor kritérium és iránylisták alapján összegyűjti az összes 'biztos' fát
+get_sure_trees([], _, [], SureTrees) :- SureTrees = [].
 
 get_sure_trees([HTreeRow-HTreeCol|TailTrees], oszl(Index, Db), [HeadTreeDirs|TailTreeDirs], SureTrees) :- 
     HorizontalDist is HTreeCol - Index,
@@ -380,13 +411,17 @@ get_sure_trees([HTreeRow-HTreeCol|TailTrees], sor(Index, Db), [HeadTreeDirs|Tail
     ;
         get_sure_trees(TailTrees, sor(Index, Db), TailTreeDirs, SureTrees)
     ).
-    
-get_sure_trees([], _, [], SureTrees) :- SureTrees = [].
 
+% A bemenő fa, oszlop/sor kritérium és fához tartozó irányok alapján ellenőrzi, hogy 
+% az irányokkal képzett sátrak alapján a fa 'biztos' fa-e
 check_tree_for_sure(Tree, LineLimit, Dirs) :-
     length(Dirs, Length),
     Length =< 2,
     tents_are_right(Tree, LineLimit, Dirs).
+
+% A bemenő fa, oszlop/sor kritérium, és fához tartozó irányok alapján ellenőrzi, hogy
+% az irányokkal képzett sátrak megfelelnek a kritériumnak
+tents_are_right(_, _, []).
 
 tents_are_right(Tree, sor(Index, _), [HeadDir|TailDirs]) :-
     create_tent(Tree, HeadDir, Tent),
@@ -400,12 +435,12 @@ tents_are_right(Tree, oszl(Index, _), [HeadDir|TailDirs]) :-
     TentCol == Index,
     tents_are_right(Tree, oszl(Index, _), TailDirs).
 
-tents_are_right(_, _, []) :- true.
-
+% A bemenő fa és irány alapján előállítja a fa sátrát
 create_tent(TreeRow-TreeCol, n, Tent) :- NewRow is TreeRow - 1, NewRow-TreeCol = Tent.
 create_tent(TreeRow-TreeCol, s, Tent) :- NewRow is TreeRow + 1, NewRow-TreeCol = Tent.
 create_tent(TreeRow-TreeCol, e, Tent) :- NewCol is TreeCol + 1, TreeRow-NewCol = Tent.
 create_tent(TreeRow-TreeCol, w, Tent) :- NewCol is TreeCol - 1, TreeRow-NewCol = Tent.
 
+% Listákat tartalmazó listából elemeket tartalmazó listát csinál
 flatten([[H]|T], [H|Tail]) :- flatten(T, Tail).
 flatten([], []).
