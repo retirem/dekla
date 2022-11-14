@@ -1,272 +1,516 @@
-defmodule Nhf1 do
+:- use_module(library(lists), [nth0/3, nth0/4]).
 
-  @moduledoc """
-  Kemping
-  @author "Reiter Márton marci.reiter501@gmail.com"
-  @date   "2022-10-16"
-  ...
-  """
+satrak(satrak(RowNumbers, ColNumbers, Trees), Solution) :-
+    length(RowNumbers, RowLength),
+    length(ColNumbers, ColLength),
+    iranylistak(RowLength-ColLength, Trees, DirectionsLists),
+   	do_shrunks(Trees, DirectionsLists, RowNumbers, ColNumbers, ShrunkedDirs),
+    solve(Trees, ShrunkedDirs, RowNumbers, ColNumbers, Return),
+    flatten(Return, Solution).    
 
-  @type row   :: integer    # sor száma (1-től n-ig)
-  @type col   :: integer    # oszlop száma (1-től m-ig)
-  @type field :: {row, col} # egy parcella koordinátái
+solve(Trees, ShrunkedDirs, RowNumbers, ColNumbers, Solution) :- 
+    sub_solve(Trees, ShrunkedDirs, ShrunkedDirs, RowNumbers, ColNumbers, 0, Solution).
 
-  @type tents_count_rows :: [integer] # a sátrak száma soronként
-  @type tents_count_cols :: [integer] # a sátrak száma oszloponként
+sub_solve(Trees, [HeadDirs|TailDirs], ShrunkedDirs, RowNumbers, ColNumbers, ValidIndex, Solution) :-
+    length(HeadDirs, Length),
+    NextValidIndex is ValidIndex + 1, 
+    (Length == 1 -> 
+    Solution = [HeadDirs|Ret],
+        sub_solve(Trees, TailDirs, ShrunkedDirs, RowNumbers, ColNumbers, NextValidIndex, Ret)
+    ;
+    	member(DirElement, HeadDirs),
+        nth0(ValidIndex, ShrunkedDirs, _, Rest),
+        nth0(ValidIndex, NewShrunked, [DirElement], Rest),  
+    	do_shrunks(Trees, NewShrunked, RowNumbers, ColNumbers, ShrunkedAgain),
+        length(Pref, ValidIndex),
+        append(Pref, SubShrunked, ShrunkedAgain),
+        sub_solve(Trees, SubShrunked, ShrunkedAgain, RowNumbers, ColNumbers, ValidIndex, Solution)
+	).
 
-  @type trees       :: [field]   # a fákat tartalmazó parcellák koordinátái lexikálisan rendezve
-  @type puzzle_desc :: {tents_count_rows, tents_count_cols, trees} # a feladványleíró hármas
-  
-  @type dir       :: :n | :e | :s | :w # a sátorpozíciók iránya: north, east, south, west
-  @type tent_dirs :: [dir]             # a sátorpozíciók irányának listája a fákhoz képest
+sub_solve(_, [], _, _, _, _, Solution) :-
+    Solution = [].
 
-  @spec satrak(pd::puzzle_desc) :: tss::[tent_dirs]
-  # tss a pd feladványleíróval megadott feladvány összes megoldásának listája, tetszőleges sorrendben.
+/*check_one_element([]) :- true.
 
-  @spec check_sol(pd::puzzle_desc, dirs::tent_dirs) :: boolean()
-  # Az {rs, cs, ts} = pd feladványleíró és a ds sátorirány-lista
-  # alapján elvégzett ellenőrzés eredménye a cd hibaleíró, ahol
-  #   rs a sátrak soronként elvárt számának a listája,
-  #   cs a sátrak oszloponként elvárt számának a listája,
-  #   ts a fákat tartalmazó parcellák koordinátájának a listája
-  # Az {e_rows, e_cols, e_touch} = ed hármas elemei olyan
-  # kulcs-érték párok, melyekben a kulcs a hiba jellegére utal, az
-  # érték pedig a hibahelyeket felsoroló lista (üres, ha nincs hiba).
+check_one_element([[_]|TailDirList]) :-
+    check_one_element(TailDirList).*/
 
-  @spec summary(numbers::[integer], row::boolean(), tents::[field]) :: [integer]
-  # Összegzi az adott sorban vagy oszlopban található sátrak számát és
-  # visszaadja egy listában.
-
-  @spec compare_lists(numbers::[integer], summary::[integer]) :: [integer]
-  # Összehasonlítja a várt és a kapott sátor mennyiséget adott sorban/oszlopban
-  # és visszaadja a nem egyező sor- vagy oszlop indexét.
-
-  @spec check_dir(rowNumbers::[integer], colNumbers::[integer], tent::field, trees::trees, dir::dir) :: dir
-  # Megvizsgálja, hogy a kapott dir opcionális iránya-e a tent-nek. Tehát nem 
-  # ütközik másik fával, és nem megy ki a mezőről a sátor, ha ide tesszük.
-
-  @spec collision(new_tent::field, current_tents::[field]) :: boolean()
-  # Kiszámolja a fákhoz tartozó sátrak helyét, amennyiben létezik a fához irány, majd megnézi, 
-  # hogy a legutolsó sátor pozíciója ütközik-e valamelyik másik sátoréval.
-
-  @spec solve(trees::trees, rowNumbers::[integer], colNumbers::[integer], chosen_dirs::tent_dirs, pure_trees::trees, current_tents::[field]) :: [tent_dirs]
-  # Segédfüggvénye a satrak-nak. Rekurzívan végigmegy a fák helyzetén, és a hozzájuk tartozó irányokon. 
-  # Minden kombinációt letesztel, majd ha üres listára jut, mert végig ért az összes fán és 
-  # mindegyikhez talált egy lehetséges irányt, akkor visszaadja a kigyűjtött irányokat. Ha valahol 
-  # olyan irányra lépett, ami ütközéshez vezet, akkor üres listát ad vissza.
-
-  @spec calculate_dirs(rowNumbers::[integer], colNumbers::[integer], tree::field, trees::trees) :: tent_dirs 
-  # Egy fához tartozó lehetséges irányok listáját adja meg, figyelembe véve, hogy ne menjen ki 
-  # a jövőbeli sátor a mezőről, illetve, hogy egy sorba és oszlopba csak akkor lehessen letenni egy sátrat, 
-  # ha van még hely.
-
-  # A függvény összehasonlít két integer listát, és visszaadja azokat az indexeket,
-  # ahol eltérés van a két listában.
-  defp compare_lists(numbers, summary) do 
-    for(
-        index <- 0..length(numbers) - 1,
-        num = Enum.at(numbers, index),
-        sum = Enum.at(summary, index),
-        num != sum,
-        do: (
-            index
-        )
-    )
-  end
-
-  # Ha az adott sorra/oszlopra meg van adva nem negatív 
-  # sátorszám korlát, akkor összegzi az adott sorban/oszlopban 
-  # lévő sátrak számát. Egyébként visszaadja a korlátot.
-  defp summary(numbers, row, tents) do
-    for(
-        index <- 0..length(numbers) - 1,
-        num = Enum.at(numbers, index),
-        do: (
-            if num >= 0 do
-                length(Enum.filter(tents, fn(x) -> elem(x, row && 0 || 1) == (index + 1) end))
-            else
-                num
-            end
-        )
-    )
-  end
-
-  # Megvizsgálja, hogy a kapott puzzle_desc és a hozzá tartozó 
-  # irányok által elkészített elrendezés helyes-e.
-  defp check_sol(pd, dirs) do
-        {rowNumbers, colNumbers, treeCells} = pd
-
-        tents = for(
-            treeIndex <- 0..length(treeCells) - 1,
-            tree = Enum.at(treeCells, treeIndex),
-            dir = Enum.at(dirs, treeIndex),
-            do: (
-              create_tent(tree, dir)
-            )
-        )
-
-        rowSum = summary(rowNumbers, true, tents)
-        colSum = summary(colNumbers, false, tents)
-        badRows = compare_lists(rowNumbers, rowSum)
-        badCols = compare_lists(colNumbers, colSum)
+do_shrunks(Trees, DirectionLists, RowNumbers, ColNumbers, ShrunkedList) :-
+    /*(do_shrunk_row(Trees, DirectionLists, RowNumbers, 1, TempShrunkedLists) ->  
+    	(shrunk_trees(Trees, TempShrunkedLists, ShrunkedDirs) ->
         
-        touches = for(
-            tent <- tents,
-            tent2 <- tents,
-            tent != tent2,
-            do: (
-                {x1, y1} = tent;
-                {x2, y2} = tent2
-                
-                if abs(x1 - x2) <= 1 && abs(y1 - y2) <= 1 do
-                    tent
-                end
-            ) 
+        
         )
-        sanitizedTouches = touches |> Enum.uniq |> Enum.reject(&is_nil/1)
-        length(badRows) == 0 && length(badCols) == 0 && length(sanitizedTouches) == 0
-  end
+    ;   
+    	shrunk_trees(Trees, TempShrunkedLists, ShrunkedDirs),
+    	do_shrunk_col(Trees, ShrunkedDirs, ColNumbers, 1, ShrunkedList)
+    ).*/
+    do_shrunk_row(Trees, DirectionLists, RowNumbers, 1, TempShrunkedLists),
+    shrunk_trees(Trees, TempShrunkedLists, ShrunkedDirs),
+    do_shrunk_col(Trees, ShrunkedDirs, ColNumbers, 1, ShrunkedList).
+    /*shrunk_trees(Trees, DirectionLists, ShrunkedDirs),
+    (do_shrunk_row(Trees, ShrunkedDirs, RowNumbers, 1, TempShrunkedLists) -> 
+    	do_shrunk_col(Trees, TempShrunkedLists, ColNumbers, 1, ShrunkedList)
+    ;   
+    	do_shrunk_col(Trees, ShrunkedDirs, ColNumbers, 1, ShrunkedList)
+    ).*/
 
-  # Vizsgálja, hogy a dir-nek megfelelően elhelyezett sátor, 
-  # helyesen van-e elhelyezve. Azaz nem üktözik semmivel, 
-  # nem lóg ki a mezőről. Ha helyes az elhelyezés, 
-  # visszaadja az irányt, egyébként nil-t.
-  defp check_dir(rowNumbers, colNumbers, tent, trees, dir) when dir == :n do 
-    if elem(tent, 0) > 0 &&
-      Enum.at(rowNumbers, elem(tent, 0) - 1) != 0 &&
-      Enum.at(colNumbers, elem(tent, 1) - 1) != 0 &&
-      !(tent in trees) do
-        dir
-    end
-  end
-
-  # Vizsgálja, hogy a dir-nek megfelelően elhelyezett sátor, 
-  # helyesen van-e elhelyezve. Azaz nem üktözik semmivel, 
-  # nem lóg ki a mezőről. Ha helyes az elhelyezés, 
-  # visszaadja az irányt, egyébként nil-t.
-  defp check_dir(rowNumbers, colNumbers, tent, trees, dir) when dir == :s do 
-    if elem(tent, 0) <= length(rowNumbers) &&
-      Enum.at(rowNumbers, elem(tent, 0) - 1) != 0 &&
-      Enum.at(colNumbers, elem(tent, 1) - 1) != 0 &&
-      !(tent in trees) do
-        dir
-    end
-  end
-
-  # Vizsgálja, hogy a dir-nek megfelelően elhelyezett sátor, 
-  # helyesen van-e elhelyezve. Azaz nem üktözik semmivel, 
-  # nem lóg ki a mezőről. Ha helyes az elhelyezés, 
-  # visszaadja az irányt, egyébként nil-t.
-  defp check_dir(rowNumbers, colNumbers, tent, trees, dir) when dir == :e do 
-    if elem(tent, 1) <= length(colNumbers) &&
-      Enum.at(rowNumbers, elem(tent, 0) - 1) != 0 &&
-      Enum.at(colNumbers, elem(tent, 1) - 1) != 0 && 
-      !(tent in trees) do
-        dir
-    end
-  end
-
-  # Vizsgálja, hogy a dir-nek megfelelően elhelyezett sátor, 
-  # helyesen van-e elhelyezve. Azaz nem üktözik semmivel, 
-  # nem lóg ki a mezőről. Ha helyes az elhelyezés, 
-  # visszaadja az irányt, egyébként nil-t.
-  defp check_dir(rowNumbers, colNumbers, tent, trees, dir) when dir == :w do 
-    if elem(tent, 1) > 0 && 
-      Enum.at(rowNumbers, elem(tent, 0) - 1) != 0 &&
-      Enum.at(colNumbers, elem(tent, 1) - 1) != 0 &&
-      !(tent in trees) do
-        dir
-    end
-  end
-
-  # Vizsgálja, hogy a kapott új sátor, ütközik-e a már 
-  # elhelyezett sátrak valamelyikével.
-  defp collision(new_tent, current_tents) do
-    if(new_tent in current_tents) do
-      true
-    else
-      touches = for(
-            tent <- current_tents,
-            {x2, y2} = new_tent,
-            do: (
-                {x1, y1} = tent;
-                if abs(x1 - x2) <= 1 && abs(y1 - y2) <= 1 do
-                    tent
-                end
-            ) 
+do_shrunk_col(Trees, DirectionLists, [HeadColNum|TailColNums], Index, ShrunkedDirs) :-
+    NextIndex is Index + 1,
+    (HeadColNum >= 0 ->  
+    	(osszeg_szukites(Trees, oszl(Index, HeadColNum), DirectionLists, Shrunked) ->
+        	Shrunked \= [],
+        	do_shrunk_col(Trees, Shrunked, TailColNums, NextIndex, ShrunkedDirs)
+        ;   
+        	do_shrunk_col(Trees, DirectionLists, TailColNums, NextIndex, ShrunkedDirs)
         )
-      length(Enum.filter(touches, fn(x) -> x != nil end)) > 0
-    end
-  end
+    ;   
+    	do_shrunk_col(Trees, DirectionLists, TailColNums, NextIndex, ShrunkedDirs)
+    ).
 
-  
-  # A kapott fa és irány alapján előállít egy sátrat.
-  defp create_tent(tree, dir) do
-    cond do
-      dir === :n ->
-        {elem(tree, 0) - 1, elem(tree, 1)}
-      dir == :s ->
-        {elem(tree, 0) + 1, elem(tree, 1)}
-      dir == :e ->
-        {elem(tree, 0), elem(tree, 1) + 1}
-      dir == :w ->
-        {elem(tree, 0), elem(tree, 1) - 1}
-      true ->
-        {}
-    end
-  end
+do_shrunk_col(_,  ShrunkedList, [], _, ShrunkedDirs) :-
+    ShrunkedDirs = ShrunkedList.
 
-  
-  # Visszaadja azoknak az irányoknak a listáját, amik szóba 
-  # jöhetnek a tree fa helyzetéhez.
-  defp calculate_dirs(rowNumbers, colNumbers, tree, trees) do
-    [check_dir(rowNumbers, colNumbers, create_tent(tree, :n), trees, :n), 
-    check_dir(rowNumbers, colNumbers, create_tent(tree, :s), trees, :s), 
-    check_dir(rowNumbers, colNumbers, create_tent(tree, :e), trees, :e), 
-    check_dir(rowNumbers, colNumbers, create_tent(tree, :w), trees, :w)] 
-    |> Enum.uniq |> Enum.reject(fn(x) -> is_nil(x) end)
-  end
+do_shrunk_row(Trees, DirectionLists, [HeadRowNum|TailRowNums], Index, ShrunkedDirs) :-
+    NextIndex is Index + 1,
+    (HeadRowNum >= 0 ->  
+    	(osszeg_szukites(Trees, sor(Index, HeadRowNum), DirectionLists, Shrunked) ->  
+        	Shrunked \= [],
+    		do_shrunk_row(Trees, Shrunked, TailRowNums, NextIndex, ShrunkedDirs)
+    	;   
+    		do_shrunk_row(Trees, DirectionLists, TailRowNums, NextIndex, ShrunkedDirs)
+    	)
+    ;   
+    	do_shrunk_row(Trees, DirectionLists, TailRowNums, NextIndex, ShrunkedDirs)
+    ).
 
-  
-  # A solve azon verziója, amikor már elfogytak az ellenőrizendő fák, 
-  # tehát megoldásra jutottunk, így visszaadja a már kiválasztott irányokat.
-  defp solve([], _rowNumbers, _colNumbers, chosen_dirs, _pure_trees, _current_tents) do
-    chosen_dirs
-  end
-
-  
-  # A satrak segdéfüggvénye, lényegében ez végzi az algoritmus futtatását rekurzívan. 
-  # Kiszámítja adott fához a lehetséges irányokat, figyelembe véve a már elhelyezett 
-  # sátrakat is, majd minden lehetséges irányra továbbhívja saját magát, átadva 
-  # az eddig nem vizsgált fákat, a már elhelyezett sátrakat, és csökkentve a 
-  # sor/oszlop korlátokat az újonnan elhelyezett sátor helyén.
-  defp solve(trees, rowNumbers, colNumbers, chosen_dirs, pure_trees, current_tents) do
-    [tree | tail] = trees
+do_shrunk_row(_, ShrunkedList, [], _, ShrunkedDirs) :-
+    ShrunkedDirs = ShrunkedList.
     
-    dirs_for_tree = calculate_dirs(rowNumbers, colNumbers, tree, pure_trees) 
-    |> Enum.filter(fn(x) -> !collision(create_tent(tree, x), current_tents) end)
+shrunk_trees(Trees, DirectionsLists, Return) :-
+    do_shrunk_dir(Trees, Trees, 1, DirectionsLists, Shrunked),
+    (DirectionsLists \= Shrunked -> 
+        shrunk_trees(Trees, Shrunked, Return)
+    ;
+        Return = Shrunked
+    ).
 
-    for(
-      dir <- dirs_for_tree,
-      do: (
-        tent = create_tent(tree, dir);
-        solve(tail, 
-        List.replace_at(rowNumbers, elem(tent, 0) - 1, Enum.at(rowNumbers, elem(tent, 0) - 1) - 1),
-        List.replace_at(colNumbers, elem(tent, 1) - 1, Enum.at(colNumbers, elem(tent, 1) - 1) - 1),
-        [dir | chosen_dirs], pure_trees, [tent | current_tents])
-      )
-    )
-  end
+do_shrunk_dir(Trees, [_|TailTrees], Index, DirectionLists, Return) :-
+    NextIndex is Index + 1,
+    (sator_szukites(Trees, Index, DirectionLists, Shrunked) ->  
+    	Shrunked \= [],
+    	do_shrunk_dir(Trees, TailTrees, NextIndex, Shrunked, Return)
+    ;
+    	do_shrunk_dir(Trees, TailTrees, NextIndex, DirectionLists, Return)
+    ).
 
-  # Ha nincsenek fák, nincsenek irányok
-  def satrak({_rows, _cols, []}), do: []
-  
-  # Előállítja a kapott puzzle_desc-hez a megoldásokat.
-  def satrak(pd) do
-    {rowNumbers, colNumbers, trees} = pd
-    List.flatten(solve(trees, rowNumbers, colNumbers, [], trees, [])) 
-    |> Enum.reverse 
-    |> Enum.chunk_every(length(trees)) 
-    |> Enum.filter(fn(x) -> check_sol(pd, x) end)
-  end
-end
+do_shrunk_dir(_, [], _, FinalShrunkedList, ReturnList) :-
+    ReturnList = FinalShrunkedList.
+
+/* ------------------------- LEGACY ---------------------------- */
+
+iranylistak(RowCol, Trees, DirectionList) :-
+    create_dir_lists(RowCol, Trees, Trees, TempList),
+    (\+memberchk([], TempList) ->  
+    	DirectionList = TempList
+    ; 
+    	DirectionList = []
+    ).
+
+iranylistak(_, [], DirectionList) :-
+    DirectionList = [].
+
+create_dir_lists(RowCol, Trees, [HCurrentTree|TCurrentTrees], DirectionList) :-
+    dirlist_single_tree(RowCol, [n,s,w,e], HCurrentTree, Trees,  ListForTree),
+    sort(ListForTree, Sorted),
+    DirectionList = [Sorted|NewDirList],
+    create_dir_lists(RowCol, Trees, TCurrentTrees, NewDirList).
+
+create_dir_lists(_, _, [], NewDirList) :-
+    NewDirList = [].
+
+dirlist_single_tree(RowNum-ColNum, [HDir|TDirs], Tree, Trees, CurrentDirs) :-
+    create_tent(Tree, HDir, Tent),
+    ((tent_inside(RowNum, ColNum, Tent), \+memberchk(Tent, Trees)) ->  
+    	CurrentDirs = [HDir|NewCurrentDirs],
+        dirlist_single_tree(RowNum-ColNum, TDirs, Tree, Trees, NewCurrentDirs)
+    ;   
+    	dirlist_single_tree(RowNum-ColNum, TDirs, Tree, Trees, CurrentDirs)
+    ).
+
+dirlist_single_tree(_, [], _, _, NewCurrentDirs) :-
+    NewCurrentDirs = [].
+
+tent_inside(RowNum, ColNum, TentRow-TentCol) :-
+    (TentRow > 0 , TentRow =< RowNum , TentCol > 0 , TentCol =< ColNum).
+
+/* sator_szukites */
+
+sator_szukites(Trees, SpecialTreeIndex, TreesDirLists, ShrunkLists) :-
+    ValidIndex is SpecialTreeIndex - 1,
+    nth0(ValidIndex, TreesDirLists, DirForIndexedTree),
+    check_length_one(DirForIndexedTree),
+    nth0(ValidIndex, Trees, Tree),
+    [Dir|_] = DirForIndexedTree,
+    create_tent(Tree, Dir, Tent),
+    magic(Tent, Tree, Trees, TreesDirLists, NewList),
+    (\+memberchk([], NewList) -> 
+        ShrunkLists = NewList
+    ;
+        ShrunkLists = []
+    ).
+
+check_length_one([_X|[]]).
+
+%check_nth_element(List) :-
+%    length(List, Length), Length == 1.
+
+magic(Tent, Tree, Trees, TreesDirLists, ShrunkLists) :-
+    collect_coords(Tent, Coords, 0),
+    CheckingCoords = [Tent|Coords],
+    shrunk_lists(CheckingCoords, Tent, Tree, Trees, TreesDirLists, ShrunkLists).
+
+shrunk_lists(CheckingCoords, Tent, SelectedTree, [HeadTree|TailTrees], [HeadTreeDirsList|TailTreeDirsLists], ReturnedLists) :-
+    (SelectedTree == HeadTree -> 
+        ReturnedLists = [HeadTreeDirsList|NewReturnedLists],
+        shrunk_lists(CheckingCoords, Tent, SelectedTree, TailTrees, TailTreeDirsLists, NewReturnedLists)
+    ;
+        (in_distance(Tent, HeadTree) -> 
+        	new_dirs_tree(CheckingCoords, HeadTree, HeadTreeDirsList, NewDirList),
+            ReturnedLists = [NewDirList|NewReturnedLists],
+            shrunk_lists(CheckingCoords, Tent, SelectedTree, TailTrees, TailTreeDirsLists, NewReturnedLists)
+        ;
+            ReturnedLists = [HeadTreeDirsList|NewReturnedLists],
+            shrunk_lists(CheckingCoords, Tent, SelectedTree, TailTrees, TailTreeDirsLists, NewReturnedLists)
+        )
+    ).
+
+shrunk_lists(_, _, _, [], [], ReturnedLists) :-
+    ReturnedLists = [].
+
+in_distance(STreeX-STreeY, CTreeX-CTreeY) :-
+    HorizontalDist is STreeX-CTreeX,
+    VerticalDist is STreeY-CTreeY,
+    HorizontalAbs is abs(HorizontalDist),
+    VerticalAbs is abs(VerticalDist),
+    ((HorizontalAbs =< 2 , VerticalAbs =< 1) ; (HorizontalAbs =< 1 , VerticalAbs =< 2)), !.
+
+new_dirs_tree(CheckingCoords, Tree, [HeadDir|TailDirs], DirList) :-
+    create_tent(Tree, HeadDir, Tent),
+    (memberchk(Tent, CheckingCoords) ->
+        new_dirs_tree(CheckingCoords, Tree, TailDirs, DirList)
+    ;
+        DirList = [HeadDir|NewDirList],
+        new_dirs_tree(CheckingCoords, Tree, TailDirs, NewDirList)
+    ).
+
+new_dirs_tree(_, _, [], NewDirList) :-
+    NewDirList = [].
+
+
+collect_coords(Tent, Coords, Index) :-
+    coord_by_index(Tent, Index, Coord),
+    NextIndex is Index + 1,
+    Coords = [Coord|NewCoords],
+    collect_coords(Tent, NewCoords, NextIndex).
+
+collect_coords(_, NewCoords, 8) :-
+    NewCoords = [].
+
+% /*coord_by_index(TentX-TentY, Index, Coord) :- 
+%     (Index == 0 , NewX is TentX + 1 , Coord = NewX-TentY); /* middle bottom *
+%     (Index == 1 , NewX is TentX - 1 , Coord = NewX-TentY); /* middle top *
+%     (Index == 2 , NewY is TentY + 1 , Coord = TentX-NewY); /* middle right *
+%     (Index == 3 , NewY is TentY - 1 , Coord = TentX-NewY); /* middle left *
+%     (Index == 4 , NewX is TentX + 1 , NewY is TentY + 1 , Coord = NewX-NewY); /* corner bottom right *
+%     (Index == 5 , NewX is TentX + 1 , NewY is TentY - 1 , Coord = NewX-NewY); /* corner bottom left *
+%     (Index == 6 , NewX is TentX - 1 , NewY is TentY + 1 , Coord = NewX-NewY); /* corner top right *
+%     (Index == 7 , NewX is TentX - 1 , NewY is TentY - 1 , Coord = NewX-NewY). /* corner top left */
+
+coord_by_index(X-Y, 0, NewX-Y) :- NewX is X + 1. /* middle bottom */
+coord_by_index(X-Y, 1, NewX-Y) :- NewX is X - 1. /* middle top */
+coord_by_index(X-Y, 2, X-NewY) :- NewY is Y + 1. /* middle right */
+coord_by_index(X-Y, 3, X-NewY) :- NewY is Y - 1. /* middle left */
+coord_by_index(X-Y, 4, NewX-NewY) :- NewX is X + 1, NewY is Y + 1. /* corner bottom right */
+coord_by_index(X-Y, 5, NewX-NewY) :- NewX is X + 1, NewY is Y - 1. /* corner bottom left */
+coord_by_index(X-Y, 6, NewX-NewY) :- NewX is X - 1, NewY is Y + 1. /* corner top right */
+coord_by_index(X-Y, 7, NewX-NewY) :- NewX is X - 1, NewY is Y - 1. /* corner top left */
+
+
+/* osszeg_szukites */
+
+osszeg_szukites(Trees, SumCondition, TreeDirs, ShrunkDirs) :-
+    get_sure_trees(Trees, SumCondition, TreeDirs, Sures),
+    get_perhaps_trees(Trees, SumCondition, TreeDirs, Perhapses),
+    shrunk(Trees, Sures, Perhapses, SumCondition, TreeDirs, ShrunkDirs),!.
+
+shrunk(Trees, SureTrees, PerhapsTrees, SumCondition, OriginalDirList, Shrunks) :-
+    length(SureTrees, SureLength),
+    length(PerhapsTrees, PerhapsLength),
+    decide_on_length(Trees, SureLength, PerhapsLength, PerhapsTrees, OriginalDirList, SumCondition, Shrunks).
+
+decide_on_length(Trees, SureLength, PerhapsLength, PerhapsTrees, OriginalDirList, sor(RowCount, RowNum), Shrunks) :-
+    (SureLength > RowNum , Shrunks = []);
+    (SureLength == RowNum , 
+        no_perhapses_row(Trees, PerhapsTrees, OriginalDirList, RowCount, Shrunks)
+    );
+    (TempSum is SureLength + PerhapsLength,
+        TempSum < RowNum,
+        Shrunks = []
+    );
+    (TempSum is SureLength + PerhapsLength,
+        TempSum == RowNum,
+        all_perhapses_row(Trees, PerhapsTrees, OriginalDirList, RowCount, Shrunks)
+    ).
+
+decide_on_length(Trees, SureLength, PerhapsLength, PerhapsTrees, OriginalDirList, oszl(ColCount, ColNum), Shrunks) :-
+    (SureLength > ColNum , Shrunks = []);
+    (SureLength == ColNum , 
+        no_perhapses_col(Trees, PerhapsTrees, OriginalDirList, ColCount, Shrunks)
+    );
+    (TempSum is SureLength + PerhapsLength,
+        TempSum < ColNum,
+        Shrunks = []
+    );
+    (TempSum is SureLength + PerhapsLength,
+        TempSum == ColNum,
+        all_perhapses_col(Trees, PerhapsTrees, OriginalDirList, ColCount, Shrunks)
+    ).
+
+get_no_correct_dirs_col([_-HeadTentCol|TailTents], [HeadOriginalDir|TailOriginalDirs], ColCount, Dirs) :-
+    (HeadTentCol \= ColCount,
+        Dirs = [HeadOriginalDir|Ret],
+        get_no_correct_dirs_col(TailTents, TailOriginalDirs, ColCount, Ret)
+    ;
+        get_no_correct_dirs_col(TailTents, TailOriginalDirs, ColCount, Dirs)
+    ).
+
+get_no_correct_dirs_col([], [], _, Dirs) :-
+    Dirs = [].
+
+get_no_correct_dirs_row([HeadTentRow-_|TailTents], [HeadOriginalDir|TailOriginalDirs], RowCount, Dirs) :-
+    (HeadTentRow \= RowCount,
+        Dirs = [HeadOriginalDir|Ret],
+        get_no_correct_dirs_row(TailTents, TailOriginalDirs, RowCount, Ret)
+    ;
+        get_no_correct_dirs_row(TailTents, TailOriginalDirs, RowCount, Dirs)
+    ).
+
+get_no_correct_dirs_row([], [], _, Dirs) :-
+    Dirs = [].
+
+get_all_correct_dirs_col([_-HeadTentCol|TailTents], [HeadOriginalDir|TailOriginalDirs], ColCount, Dirs) :-
+    (HeadTentCol == ColCount,
+        Dirs = [HeadOriginalDir|Ret],
+        get_all_correct_dirs_col(TailTents, TailOriginalDirs, ColCount, Ret)
+    ;
+        get_all_correct_dirs_col(TailTents, TailOriginalDirs, ColCount, Dirs)
+    ).
+
+get_all_correct_dirs_col([], [], _, Dirs) :-
+    Dirs = [].
+
+get_all_correct_dirs_row([HeadTentRow-_|TailTents], [HeadOriginalDir|TailOriginalDirs], RowCount, Dirs) :-
+    (HeadTentRow == RowCount,
+        Dirs = [HeadOriginalDir|Ret],
+        get_all_correct_dirs_row(TailTents, TailOriginalDirs, RowCount, Ret)
+    ;
+        get_all_correct_dirs_row(TailTents, TailOriginalDirs, RowCount, Dirs)
+    ).
+
+get_all_correct_dirs_row([], [], _, Dirs) :-
+    Dirs = [].
+
+no_perhapses_col([HeadTree|TailTrees], PerhapsTrees, [OriginalHeadDirs|OriginalTailDirs], ColCount, ShrunkDirs) :-
+    [HeadPerhapsTree|TailPerhapsTrees] = PerhapsTrees,
+    (HeadTree == HeadPerhapsTree ->
+        create_tents(HeadTree, OriginalHeadDirs, Tents),
+        get_no_correct_dirs_col(Tents, OriginalHeadDirs, ColCount, NewDirs),
+        ShrunkDirs = [NewDirs|Ret],
+        no_perhapses_col(TailTrees, TailPerhapsTrees, OriginalTailDirs, ColCount, Ret)
+    ;
+        ShrunkDirs = [OriginalHeadDirs|Ret],
+        no_perhapses_col(TailTrees, PerhapsTrees, OriginalTailDirs, ColCount, Ret)
+    ).
+
+no_perhapses_col(_, [], Dirs, _, ShrunkDirs) :-
+    ShrunkDirs = Dirs.
+
+no_perhapses_col([], _, _, _, ShrunkDirs) :-
+    ShrunkDirs = [].
+
+no_perhapses_row([HeadTree|TailTrees], PerhapsTrees, [OriginalHeadDirs|OriginalTailDirs], RowCount, ShrunkDirs) :-
+    [HeadPerhapsTree|TailPerhapsTrees] = PerhapsTrees,
+    (HeadTree == HeadPerhapsTree ->
+        create_tents(HeadTree, OriginalHeadDirs, Tents),
+        get_no_correct_dirs_row(Tents, OriginalHeadDirs, RowCount, NewDirs),
+        ShrunkDirs = [NewDirs|Ret],
+        no_perhapses_row(TailTrees, TailPerhapsTrees, OriginalTailDirs, RowCount, Ret)
+    ;
+        ShrunkDirs = [OriginalHeadDirs|Ret],
+        no_perhapses_row(TailTrees, PerhapsTrees, OriginalTailDirs, RowCount, Ret)
+    ).
+
+no_perhapses_row(_, [], Dirs, _, ShrunkDirs) :-
+    ShrunkDirs = Dirs.
+
+no_perhapses_row([], _, _, _, ShrunkDirs) :-
+    ShrunkDirs = [].
+
+all_perhapses_col([HeadTree|TailTrees], PerhapsTrees, [OriginalHeadDirs|OriginalTailDirs], ColCount, ShrunkDirs) :-
+    [HeadPerhapsTree|TailPerhapsTrees] = PerhapsTrees,
+    (HeadTree == HeadPerhapsTree ->
+        create_tents(HeadTree, OriginalHeadDirs, Tents),
+        get_all_correct_dirs_col(Tents, OriginalHeadDirs, ColCount, NewDirs),
+        ShrunkDirs = [NewDirs|Ret],
+        all_perhapses_col(TailTrees, TailPerhapsTrees, OriginalTailDirs, ColCount, Ret)
+    ;
+        ShrunkDirs = [OriginalHeadDirs|Ret],
+        all_perhapses_col(TailTrees, PerhapsTrees, OriginalTailDirs, ColCount, Ret)
+    ).
+
+all_perhapses_col(_, [], Dirs, _, ShrunkDirs) :-
+    ShrunkDirs = Dirs.
+
+all_perhapses_col([], _, _, _, ShrunkDirs) :-
+    ShrunkDirs = [].
+
+all_perhapses_row([HeadTree|TailTrees], PerhapsTrees, [OriginalHeadDirs|OriginalTailDirs], RowCount, ShrunkDirs) :-
+    [HeadPerhapsTree|TailPerhapsTrees] = PerhapsTrees,
+    (HeadTree == HeadPerhapsTree ->
+        create_tents(HeadTree, OriginalHeadDirs, Tents),
+        get_all_correct_dirs_row(Tents, OriginalHeadDirs, RowCount, NewDirs),
+        ShrunkDirs = [NewDirs|Ret],
+        all_perhapses_row(TailTrees, TailPerhapsTrees, OriginalTailDirs, RowCount, Ret)
+    ;
+        ShrunkDirs = [OriginalHeadDirs|Ret],
+        all_perhapses_row(TailTrees, PerhapsTrees, OriginalTailDirs, RowCount, Ret)
+    ).
+
+all_perhapses_row(_, [], Dirs, _, ShrunkDirs) :-
+    ShrunkDirs = Dirs.
+
+all_perhapses_row([], _, _, _, ShrunkDirs) :-
+    ShrunkDirs = [].
+
+no_collision_tent_col([_-HeadTentCol|TailTents], ColCount) :-
+    HeadTentCol \= ColCount,
+    no_collision_tent_col(TailTents, ColCount).
+
+no_collision_tent_col([], _) :-
+    true.
+
+no_collision_tent_row([HeadTentRow-_|TailTents], RowCount) :-
+    HeadTentRow \= RowCount,
+    no_collision_tent_row(TailTents, RowCount).
+
+no_collision_tent_row([], _) :-
+    true.
+
+create_tents(Tree, [HeadDir|TailDirs], Tents) :-
+    create_tent(Tree, HeadDir, Tent),
+    Tents = [Tent|Ret],
+    create_tents(Tree, TailDirs, Ret).
+
+create_tents(_, [], Tents) :-
+    Tents = [].
+
+get_perhaps_trees([HeadTree|TailTrees], sor(RowCount, RowNum), [HeadTreeDirs|TailTreeDirs], Perhapses) :-
+    (check_tree_perhaps_row(HeadTree, RowCount, HeadTreeDirs) ->
+        Perhapses = [HeadTree|Ret],
+        get_perhaps_trees(TailTrees, sor(RowCount, RowNum), TailTreeDirs, Ret)
+    ;
+        get_perhaps_trees(TailTrees, sor(RowCount, RowNum), TailTreeDirs, Perhapses)
+    ).
+
+get_perhaps_trees([HeadTree|TailTrees], oszl(ColCount, ColNum), [HeadTreeDirs|TailTreeDirs], Perhapses) :-
+    (check_tree_perhaps_col(HeadTree, ColCount, HeadTreeDirs) ->
+        Perhapses = [HeadTree|Ret],
+        get_perhaps_trees(TailTrees, oszl(ColCount, ColNum), TailTreeDirs, Ret)
+    ;
+        get_perhaps_trees(TailTrees, oszl(ColCount, ColNum), TailTreeDirs, Perhapses)
+    ).
+
+get_perhaps_trees([], _, [], Perhapses) :-
+    Perhapses = [].
+
+check_tree_perhaps_col(Tree, ColCount, Dirs) :-
+    \+check_tree_sure_col(Tree, ColCount, Dirs),
+    create_tents(Tree, Dirs, Tents),
+    \+no_collision_tent_col(Tents, ColCount).
+
+check_tree_perhaps_row(Tree, RowCount, Dirs) :-
+    \+check_tree_sure_row(Tree, RowCount, Dirs),
+    create_tents(Tree, Dirs, Tents),
+    \+no_collision_tent_row(Tents, RowCount).
+
+get_sure_trees([HeadTree|TailTrees], oszl(ColCount, ColNum), [HeadTreeDirs|TailTreeDirs], Sures) :-
+    (check_tree_sure_col(HeadTree, ColCount, HeadTreeDirs) ->
+        Sures = [HeadTree|Ret],
+        get_sure_trees(TailTrees, oszl(ColCount, ColNum), TailTreeDirs, Ret)
+    ;
+        get_sure_trees(TailTrees, oszl(ColCount, ColNum), TailTreeDirs, Sures)
+    ).
+
+get_sure_trees([HeadTree|TailTrees], sor(RowCount, RowNum), [HeadTreeDirs|TailTreeDirs], Sures) :-
+    (check_tree_sure_row(HeadTree, RowCount, HeadTreeDirs) ->
+        Sures = [HeadTree|Ret],
+        get_sure_trees(TailTrees, sor(RowCount, RowNum), TailTreeDirs, Ret)
+    ;
+        get_sure_trees(TailTrees, sor(RowCount, RowNum), TailTreeDirs, Sures)
+    ).
+
+get_sure_trees([], _, [], Sures) :-
+    Sures = [].
+
+check_tree_sure_col(Tree, ColCount, Dirs) :-
+    length(Dirs, Length),
+    Length =< 2,
+    tents_are_right_col(Tree, ColCount, Dirs).
+
+tents_are_right_col(Tree, ColCount, [HeadDir|TailDirs]) :-
+    create_tent(Tree, HeadDir, Tent),
+    _-TentCol = Tent,
+    TentCol == ColCount,
+    tents_are_right_col(Tree, ColCount, TailDirs).
+
+tents_are_right_col(_, _, []) :-
+    true.
+
+check_tree_sure_row(Tree, RowCount, Dirs) :-
+    length(Dirs, Length),
+    Length =< 2,
+    tents_are_right_row(Tree, RowCount, Dirs).
+
+tents_are_right_row(Tree, RowCount, [HeadDir|TailDirs]) :-
+    create_tent(Tree, HeadDir, Tent),
+    TentRow-_ = Tent,
+    TentRow = RowCount,
+    tents_are_right_row(Tree, RowCount, TailDirs).
+
+tents_are_right_row(_, _, []) :-
+    true.
+
+/*create_tent(TreeRow-TreeCol, Dir, Tent) :-
+    (Dir == n , NewRow is TreeRow - 1 , NewRow-TreeCol = Tent);
+    (Dir == s , NewRow is TreeRow + 1 , NewRow-TreeCol = Tent);
+    (Dir == w , NewCol is TreeCol - 1 , TreeRow-NewCol = Tent);
+    (Dir == e , NewCol is TreeCol + 1 , TreeRow-NewCol = Tent).*/
+
+create_tent(TreeRow-TreeCol, n, Tent) :- NewRow is TreeRow - 1, NewRow-TreeCol = Tent.
+create_tent(TreeRow-TreeCol, s, Tent) :- NewRow is TreeRow + 1, NewRow-TreeCol = Tent.
+create_tent(TreeRow-TreeCol, e, Tent) :- NewCol is TreeCol + 1, TreeRow-NewCol = Tent.
+create_tent(TreeRow-TreeCol, w, Tent) :- NewCol is TreeCol - 1, TreeRow-NewCol = Tent.
+
+flatten([], []).
+flatten([[H]|T], [H|Tail]) :-
+    flatten(T, Tail).
+
+
+
+
+
+
+
+
+
