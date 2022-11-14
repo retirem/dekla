@@ -212,43 +212,37 @@ coord_by_index(X-Y, 7, NewX-NewY) :- NewX is X - 1, NewY is Y - 1. /* corner top
 
 /* osszeg_szukites */
 
-osszeg_szukites(Trees, SumCondition, TreeDirs, ShrunkDirs) :-
-    get_sure_trees(Trees, SumCondition, TreeDirs, Sures),
-    get_perhaps_trees(Trees, SumCondition, TreeDirs, Perhapses),
-    shrunk(Trees, Sures, Perhapses, SumCondition, TreeDirs, ShrunkDirs),!.
+osszeg_szukites(Trees, LineLimit, TreeDirs, ShrunkDirs) :-
+    get_sure_trees(Trees, LineLimit, TreeDirs, Sures),
+    get_perhaps_trees(Trees, LineLimit, TreeDirs, Perhapses),
+    shrunk(Trees, Sures, Perhapses, LineLimit, TreeDirs, ShrunkDirs),!.
 
-shrunk(Trees, SureTrees, PerhapsTrees, SumCondition, OriginalDirList, Shrunks) :-
+shrunk(Trees, SureTrees, PerhapsTrees, LineLimit, OriginalDirList, Shrunks) :-
     length(SureTrees, SureLength),
     length(PerhapsTrees, PerhapsLength),
-    decide_on_length(Trees, SureLength, PerhapsLength, PerhapsTrees, OriginalDirList, SumCondition, Shrunks).
+    decide_on_length(Trees, SureLength, PerhapsLength, PerhapsTrees, OriginalDirList, LineLimit, Shrunks).
 
-decide_on_length(Trees, SureLength, PerhapsLength, PerhapsTrees, OriginalDirList, sor(RowCount, RowNum), Shrunks) :-
-    (SureLength > RowNum , Shrunks = []);
-    (SureLength == RowNum , 
-        no_perhapses_row(Trees, PerhapsTrees, OriginalDirList, RowCount, Shrunks)
+decide_on_length(Trees, SureLength, PerhapsLength, PerhapsTrees, OriginalDirList, sor(Index, Db), Shrunks) :-
+    TempSum is SureLength + PerhapsLength,
+    (TempSum < Db, Shrunks = []);
+    (TempSum == Db,
+        all_perhapses(Trees, PerhapsTrees, OriginalDirList, sor(Index, Db), Shrunks)
     );
-    (TempSum is SureLength + PerhapsLength,
-        TempSum < RowNum,
-        Shrunks = []
+    (SureLength == Db , 
+        no_perhapses_row(Trees, PerhapsTrees, OriginalDirList, Index, Shrunks)
     );
-    (TempSum is SureLength + PerhapsLength,
-        TempSum == RowNum,
-        all_perhapses_row(Trees, PerhapsTrees, OriginalDirList, RowCount, Shrunks)
-    ).
+    (SureLength > Db , Shrunks = []).
 
-decide_on_length(Trees, SureLength, PerhapsLength, PerhapsTrees, OriginalDirList, oszl(ColCount, ColNum), Shrunks) :-
-    (SureLength > ColNum , Shrunks = []);
-    (SureLength == ColNum , 
-        no_perhapses_col(Trees, PerhapsTrees, OriginalDirList, ColCount, Shrunks)
+decide_on_length(Trees, SureLength, PerhapsLength, PerhapsTrees, OriginalDirList, oszl(Index, Db), Shrunks) :-
+    TempSum is SureLength + PerhapsLength,
+    (TempSum < Db, Shrunks = []);
+    (TempSum == Db,
+        all_perhapses(Trees, PerhapsTrees, OriginalDirList, oszl(Index, Db), Shrunks)
     );
-    (TempSum is SureLength + PerhapsLength,
-        TempSum < ColNum,
-        Shrunks = []
+    (SureLength == Db , 
+        no_perhapses_col(Trees, PerhapsTrees, OriginalDirList, Index, Shrunks)
     );
-    (TempSum is SureLength + PerhapsLength,
-        TempSum == ColNum,
-        all_perhapses_col(Trees, PerhapsTrees, OriginalDirList, ColCount, Shrunks)
-    ).
+    (SureLength > Db , Shrunks = []).
 
 get_no_correct_dirs_col([_-HeadTentCol|TailTents], [HeadOriginalDir|TailOriginalDirs], ColCount, Dirs) :-
     (HeadTentCol \= ColCount,
@@ -272,27 +266,25 @@ get_no_correct_dirs_row([HeadTentRow-_|TailTents], [HeadOriginalDir|TailOriginal
 get_no_correct_dirs_row([], [], _, Dirs) :-
     Dirs = [].
 
-get_all_correct_dirs_col([_-HeadTentCol|TailTents], [HeadOriginalDir|TailOriginalDirs], ColCount, Dirs) :-
-    (HeadTentCol == ColCount,
-        Dirs = [HeadOriginalDir|Ret],
-        get_all_correct_dirs_col(TailTents, TailOriginalDirs, ColCount, Ret)
+    
+
+get_all_correct_dirs([HTentRow-_|TTents], [HOriginalDir|TOriginalDirs], sor(Index, _), Dirs) :-
+    (HTentRow == Index ->
+        Dirs = [HOriginalDir|Return],
+        get_all_correct_dirs(TTents, TOriginalDirs, sor(Index, _), Return)
     ;
-        get_all_correct_dirs_col(TailTents, TailOriginalDirs, ColCount, Dirs)
+        get_all_correct_dirs(TTents, TOriginalDirs, sor(Index, _), Dirs)
     ).
 
-get_all_correct_dirs_col([], [], _, Dirs) :-
-    Dirs = [].
-
-get_all_correct_dirs_row([HeadTentRow-_|TailTents], [HeadOriginalDir|TailOriginalDirs], RowCount, Dirs) :-
-    (HeadTentRow == RowCount,
-        Dirs = [HeadOriginalDir|Ret],
-        get_all_correct_dirs_row(TailTents, TailOriginalDirs, RowCount, Ret)
+get_all_correct_dirs([_-HTentCol|TTents], [HOriginalDir|TOriginalDirs], oszl(Index, _), Dirs) :-
+    (HTentCol == Index ->
+        Dirs = [HOriginalDir|Return],
+        get_all_correct_dirs(TTents, TOriginalDirs, oszl(Index, _), Return)
     ;
-        get_all_correct_dirs_row(TailTents, TailOriginalDirs, RowCount, Dirs)
+        get_all_correct_dirs(TTents, TOriginalDirs, oszl(Index, _), Dirs)
     ).
 
-get_all_correct_dirs_row([], [], _, Dirs) :-
-    Dirs = [].
+get_all_correct_dirs([], [], _, Dirs) :- Dirs = [].
 
 no_perhapses_col([HeadTree|TailTrees], PerhapsTrees, [OriginalHeadDirs|OriginalTailDirs], ColCount, ShrunkDirs) :-
     [HeadPerhapsTree|TailPerhapsTrees] = PerhapsTrees,
@@ -330,42 +322,22 @@ no_perhapses_row(_, [], Dirs, _, ShrunkDirs) :-
 no_perhapses_row([], _, _, _, ShrunkDirs) :-
     ShrunkDirs = [].
 
-all_perhapses_col([HeadTree|TailTrees], PerhapsTrees, [OriginalHeadDirs|OriginalTailDirs], ColCount, ShrunkDirs) :-
-    [HeadPerhapsTree|TailPerhapsTrees] = PerhapsTrees,
-    (HeadTree == HeadPerhapsTree ->
-        create_tents(HeadTree, OriginalHeadDirs, Tents),
-        get_all_correct_dirs_col(Tents, OriginalHeadDirs, ColCount, NewDirs),
-        ShrunkDirs = [NewDirs|Ret],
-        all_perhapses_col(TailTrees, TailPerhapsTrees, OriginalTailDirs, ColCount, Ret)
+all_perhapses([HTree|TTrees], [HPerhapsTree|TPerhapsTrees], [HOriginalDirs|TOriginalDirs], LineLimit, ShrunkDirs) :-
+    (HTree == HPerhapsTree ->
+        create_tents(HTree, HOriginalDirs, Tents),
+        get_all_correct_dirs(Tents, HOriginalDirs, LineLimit, NewDirs),
+        ShrunkDirs = [NewDirs|Return],
+        all_perhapses(TTrees, TPerhapsTrees, TOriginalDirs, LineLimit, Return)
     ;
-        ShrunkDirs = [OriginalHeadDirs|Ret],
-        all_perhapses_col(TailTrees, PerhapsTrees, OriginalTailDirs, ColCount, Ret)
+        ShrunkDirs = [HOriginalDirs|Return],
+        all_perhapses(TTrees, TPerhapsTrees, TOriginalDirs, LineLimit, Return)
     ).
 
-all_perhapses_col(_, [], Dirs, _, ShrunkDirs) :-
+all_perhapses(_, [], Dirs, _, ShrunkDirs) :-
     ShrunkDirs = Dirs.
 
-all_perhapses_col([], _, _, _, ShrunkDirs) :-
+all_perhapses([], _, _, _, ShrunkDirs) :-
     ShrunkDirs = [].
-
-all_perhapses_row([HeadTree|TailTrees], PerhapsTrees, [OriginalHeadDirs|OriginalTailDirs], RowCount, ShrunkDirs) :-
-    [HeadPerhapsTree|TailPerhapsTrees] = PerhapsTrees,
-    (HeadTree == HeadPerhapsTree ->
-        create_tents(HeadTree, OriginalHeadDirs, Tents),
-        get_all_correct_dirs_row(Tents, OriginalHeadDirs, RowCount, NewDirs),
-        ShrunkDirs = [NewDirs|Ret],
-        all_perhapses_row(TailTrees, TailPerhapsTrees, OriginalTailDirs, RowCount, Ret)
-    ;
-        ShrunkDirs = [OriginalHeadDirs|Ret],
-        all_perhapses_row(TailTrees, PerhapsTrees, OriginalTailDirs, RowCount, Ret)
-    ).
-
-all_perhapses_row(_, [], Dirs, _, ShrunkDirs) :-
-    ShrunkDirs = Dirs.
-
-all_perhapses_row([], _, _, _, ShrunkDirs) :-
-    ShrunkDirs = [].
-
 
 no_collision_tent([HTentRow-_|TailTents], sor(Index, _)) :-
     HTentRow \= Index,
