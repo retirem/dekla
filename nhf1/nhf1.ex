@@ -171,26 +171,34 @@ magic(Tent, Tree, Trees, TreesDirLists, ShrunkLists) :-
     shrunk_lists(CheckingCoords, Tent, Tree, Trees, TreesDirLists, ShrunkLists).
 
 shrunk_lists(CheckingCoords, Tent, SelectedTree, [HeadTree|TailTrees], [HeadTreeDirsList|TailTreeDirsLists], ReturnedLists) :-
-    (SelectedTree == HeadTree -> 
-        ReturnedLists = [HeadTreeDirsList|NewReturnedLists],
-        shrunk_lists(CheckingCoords, Tent, SelectedTree, TailTrees, TailTreeDirsLists, NewReturnedLists)
-    ;
-        (in_distance(Tent, HeadTree) -> 
-        	new_dirs_tree(CheckingCoords, HeadTree, HeadTreeDirsList, NewDirList),
-            ReturnedLists = [NewDirList|NewReturnedLists],
-            shrunk_lists(CheckingCoords, Tent, SelectedTree, TailTrees, TailTreeDirsLists, NewReturnedLists)
+    (below_current(Tent, HeadTree) -> 
+    	ReturnedLists = [HeadTreeDirsList|TailTreeDirsLists]
+    ;   
+    	(SelectedTree == HeadTree -> 
+          	ReturnedLists = [HeadTreeDirsList|NewReturnedLists],
+          	shrunk_lists(CheckingCoords, Tent, SelectedTree, TailTrees, TailTreeDirsLists, NewReturnedLists)
         ;
-            ReturnedLists = [HeadTreeDirsList|NewReturnedLists],
-            shrunk_lists(CheckingCoords, Tent, SelectedTree, TailTrees, TailTreeDirsLists, NewReturnedLists)
+        	(in_distance(Tent, HeadTree) -> 
+                new_dirs_tree(CheckingCoords, HeadTree, HeadTreeDirsList, NewDirList),
+                ReturnedLists = [NewDirList|NewReturnedLists],
+                shrunk_lists(CheckingCoords, Tent, SelectedTree, TailTrees, TailTreeDirsLists, NewReturnedLists)
+            ;
+                ReturnedLists = [HeadTreeDirsList|NewReturnedLists],
+                shrunk_lists(CheckingCoords, Tent, SelectedTree, TailTrees, TailTreeDirsLists, NewReturnedLists)
+            )
         )
-    ).
+	).
 
 shrunk_lists(_, _, _, [], [], ReturnedLists) :-
     ReturnedLists = [].
 
-in_distance(STreeX-STreeY, CTreeX-CTreeY) :-
-    HorizontalDist is STreeX-CTreeX,
-    VerticalDist is STreeY-CTreeY,
+below_current(STreetX-_, CTreeX-_) :-
+    HorizontalDist is CTreeX - STreetX,
+    HorizontalDist >= 3.
+
+in_distance(STentX-STentY, CTreeX-CTreeY) :-
+    HorizontalDist is STentX-CTreeX,
+    VerticalDist is STentY-CTreeY,
     HorizontalAbs is abs(HorizontalDist),
     VerticalAbs is abs(VerticalDist),
     ((HorizontalAbs =< 2 , VerticalAbs =< 1) ; (HorizontalAbs =< 1 , VerticalAbs =< 2)), !.
@@ -206,7 +214,6 @@ new_dirs_tree(CheckingCoords, Tree, [HeadDir|TailDirs], DirList) :-
 
 new_dirs_tree(_, _, [], NewDirList) :-
     NewDirList = [].
-
 
 collect_coords(Tent, Coords, Index) :-
     coord_by_index(Tent, Index, Coord),
@@ -505,12 +512,3 @@ create_tent(TreeRow-TreeCol, w, Tent) :- NewCol is TreeCol - 1, TreeRow-NewCol =
 flatten([], []).
 flatten([[H]|T], [H|Tail]) :-
     flatten(T, Tail).
-
-
-
-
-
-
-
-
-
