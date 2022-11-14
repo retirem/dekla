@@ -366,19 +366,16 @@ all_perhapses_row(_, [], Dirs, _, ShrunkDirs) :-
 all_perhapses_row([], _, _, _, ShrunkDirs) :-
     ShrunkDirs = [].
 
-no_collision_tent_col([_-HeadTentCol|TailTents], ColCount) :-
-    HeadTentCol \= ColCount,
-    no_collision_tent_col(TailTents, ColCount).
 
-no_collision_tent_col([], _) :-
-    true.
+no_collision_tent([HTentRow-_|TailTents], sor(Index, _)) :-
+    HTentRow \= Index,
+    no_collision_tent(TailTents, sor(Index, _)).
 
-no_collision_tent_row([HeadTentRow-_|TailTents], RowCount) :-
-    HeadTentRow \= RowCount,
-    no_collision_tent_row(TailTents, RowCount).
+no_collision_tent([_-HTentCol|TailTents], oszl(Index, _)) :-
+    HTentCol \= Index,
+    no_collision_tent(TailTents, oszl(Index, _)).
 
-no_collision_tent_row([], _) :-
-    true.
+no_collision_tent([], _) :- true.
 
 create_tents(Tree, [HeadDir|TailDirs], Tents) :-
     create_tent(Tree, HeadDir, Tent),
@@ -388,51 +385,79 @@ create_tents(Tree, [HeadDir|TailDirs], Tents) :-
 create_tents(_, [], Tents) :-
     Tents = [].
 
-get_perhaps_trees([HeadTree|TailTrees], sor(RowCount, RowNum), [HeadTreeDirs|TailTreeDirs], Perhapses) :-
-    (check_tree_perhaps_row(HeadTree, RowCount, HeadTreeDirs) ->
-        Perhapses = [HeadTree|Ret],
-        get_perhaps_trees(TailTrees, sor(RowCount, RowNum), TailTreeDirs, Ret)
+get_perhaps_trees([HTreeRow-HTreeCol|TailTrees], sor(Index, Db), [HeadTreeDirs|TailTreeDirs], Perhapses) :-
+    VerticalDist is HTreeRow - Index,
+    VerticalAbs is abs(VerticalDist),
+    (VerticalAbs =< 1 ->
+        (check_tree_perhaps(HTreeRow-HTreeCol, sor(Index, Db), HeadTreeDirs) ->
+            Perhapses = [HTreeRow-HTreeCol|Ret],
+            get_perhaps_trees(TailTrees, sor(Index, Db), TailTreeDirs, Ret)
+        ;
+            get_perhaps_trees(TailTrees, sor(Index, Db), TailTreeDirs, Perhapses)
+        )
     ;
-        get_perhaps_trees(TailTrees, sor(RowCount, RowNum), TailTreeDirs, Perhapses)
+        get_perhaps_trees(TailTrees, sor(Index, Db), TailTreeDirs, Perhapses)
     ).
 
-get_perhaps_trees([HeadTree|TailTrees], oszl(ColCount, ColNum), [HeadTreeDirs|TailTreeDirs], Perhapses) :-
-    (check_tree_perhaps_col(HeadTree, ColCount, HeadTreeDirs) ->
-        Perhapses = [HeadTree|Ret],
-        get_perhaps_trees(TailTrees, oszl(ColCount, ColNum), TailTreeDirs, Ret)
+get_perhaps_trees([HTreeRow-HTreeCol|TailTrees], oszl(Index, Db), [HeadTreeDirs|TailTreeDirs], Perhapses) :-
+    HorizontalDist is HTreeCol - Index,
+    HorizontalAbs is abs(HorizontalDist),
+    (HorizontalAbs =< 1 ->    
+        (check_tree_perhaps(HTreeRow-HTreeCol, oszl(Index, Db), HeadTreeDirs) ->
+            Perhapses = [HTreeRow-HTreeCol|Ret],
+            get_perhaps_trees(TailTrees, oszl(Index, Db), TailTreeDirs, Ret)
+        ;
+            get_perhaps_trees(TailTrees, oszl(Index, Db), TailTreeDirs, Perhapses)
+        )
     ;
-        get_perhaps_trees(TailTrees, oszl(ColCount, ColNum), TailTreeDirs, Perhapses)
+        get_perhaps_trees(TailTrees, oszl(Index, Db), TailTreeDirs, Perhapses)
     ).
+
 
 get_perhaps_trees([], _, [], Perhapses) :-
     Perhapses = [].
 
-check_tree_perhaps_col(Tree, ColCount, Dirs) :-
-    \+check_tree_sure_col(Tree, ColCount, Dirs),
+check_tree_perhaps(Tree, LineLimit, Dirs) :-
+    \+check_tree_for_sure(Tree, LineLimit, Dirs),
     create_tents(Tree, Dirs, Tents),
-    \+no_collision_tent_col(Tents, ColCount).
+    \+no_collision_tent(Tents, LineLimit).
 
-check_tree_perhaps_row(Tree, RowCount, Dirs) :-
-    \+check_tree_sure_row(Tree, RowCount, Dirs),
-    create_tents(Tree, Dirs, Tents),
-    \+no_collision_tent_row(Tents, RowCount).
-
-get_sure_trees([HeadTree|TailTrees], LineLimit, [HeadTreeDirs|TailTreeDirs], SureTrees) :-
-    length(HeadTreeDirs, Length), 
-    ((Length =< 2 , tents_are_right(HeadTree, LineLimit, HeadTreeDirs)) ->
-        SureTrees = [HeadTree|Return],
-        get_sure_trees(TailTrees, LineLimit, TailTreeDirs, Return)
+get_sure_trees([HTreeRow-HTreeCol|TailTrees], oszl(Index, Db), [HeadTreeDirs|TailTreeDirs], SureTrees) :- 
+    HorizontalDist is HTreeCol - Index,
+    HorizontalAbs is abs(HorizontalDist),
+    (HorizontalAbs =< 1 ->
+        (check_tree_for_sure(HTreeRow-HTreeCol, oszl(Index, Db), HeadTreeDirs) ->
+            SureTrees = [HTreeRow-HTreeCol|Return],
+            get_sure_trees(TailTrees, oszl(Index, Db), TailTreeDirs, Return)
+        ;
+            get_sure_trees(TailTrees, oszl(Index, Db), TailTreeDirs, SureTrees)
+        )
     ;
-        get_sure_trees(TailTrees, LineLimit, TailTreeDirs, SureTrees)
+        get_sure_trees(TailTrees, oszl(Index, Db), TailTreeDirs, SureTrees)
     ).
+
+get_sure_trees([HTreeRow-HTreeCol|TailTrees], sor(Index, Db), [HeadTreeDirs|TailTreeDirs], SureTrees) :- 
+    VerticalDist is HTreeRow - Index,
+    VerticalAbs is abs(VerticalDist),
+    (VerticalAbs =< 1 ->
+        (check_tree_for_sure(HTreeRow-HTreeCol, sor(Index, Db), HeadTreeDirs) ->
+            SureTrees = [HTreeRow-HTreeCol|Return],
+            get_sure_trees(TailTrees, sor(Index, Db), TailTreeDirs, Return)
+        ;
+            get_sure_trees(TailTrees, sor(Index, Db), TailTreeDirs, SureTrees)
+        )
+    ;
+        get_sure_trees(TailTrees, sor(Index, Db), TailTreeDirs, SureTrees)
+    ).
+    
 
 get_sure_trees([], _, [], SureTrees) :-
     SureTrees = [].
 
-/*check_tree_for_sure(Tree, LineLimit, Dirs) :-
+check_tree_for_sure(Tree, LineLimit, Dirs) :-
     length(Dirs, Length),
     Length =< 2,
-    tents_are_right(Tree, LineLimit, Dirs).*/
+    tents_are_right(Tree, LineLimit, Dirs).
 
 tents_are_right(Tree, sor(Index, _), [HeadDir|TailDirs]) :-
     create_tent(Tree, HeadDir, Tent),
