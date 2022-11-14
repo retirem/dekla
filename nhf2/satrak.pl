@@ -15,7 +15,7 @@ sub_solve(Trees, [HeadDirs|TailDirs], ShrunkedDirs, RowNumbers, ColNumbers, Vali
     length(HeadDirs, Length),
     NextValidIndex is ValidIndex + 1, 
     (Length == 1 -> 
-    Solution = [HeadDirs|Ret],
+        Solution = [HeadDirs|Ret],
         sub_solve(Trees, TailDirs, ShrunkedDirs, RowNumbers, ColNumbers, NextValidIndex, Ret)
     ;
     	member(DirElement, HeadDirs),
@@ -30,30 +30,10 @@ sub_solve(Trees, [HeadDirs|TailDirs], ShrunkedDirs, RowNumbers, ColNumbers, Vali
 sub_solve(_, [], _, _, _, _, Solution) :-
     Solution = [].
 
-/*check_one_element([]) :- true.
-
-check_one_element([[_]|TailDirList]) :-
-    check_one_element(TailDirList).*/
-
 do_shrunks(Trees, DirectionLists, RowNumbers, ColNumbers, ShrunkedList) :-
-    /*(do_shrunk_row(Trees, DirectionLists, RowNumbers, 1, TempShrunkedLists) ->  
-    	(shrunk_trees(Trees, TempShrunkedLists, ShrunkedDirs) ->
-        
-        
-        )
-    ;   
-    	shrunk_trees(Trees, TempShrunkedLists, ShrunkedDirs),
-    	do_shrunk_col(Trees, ShrunkedDirs, ColNumbers, 1, ShrunkedList)
-    ).*/
     do_shrunk_row(Trees, DirectionLists, RowNumbers, 1, TempShrunkedLists),
     shrunk_trees(Trees, TempShrunkedLists, ShrunkedDirs),
     do_shrunk_col(Trees, ShrunkedDirs, ColNumbers, 1, ShrunkedList).
-    /*shrunk_trees(Trees, DirectionLists, ShrunkedDirs),
-    (do_shrunk_row(Trees, ShrunkedDirs, RowNumbers, 1, TempShrunkedLists) -> 
-    	do_shrunk_col(Trees, TempShrunkedLists, ColNumbers, 1, ShrunkedList)
-    ;   
-    	do_shrunk_col(Trees, ShrunkedDirs, ColNumbers, 1, ShrunkedList)
-    ).*/
 
 do_shrunk_col(Trees, DirectionLists, [HeadColNum|TailColNums], Index, ShrunkedDirs) :-
     NextIndex is Index + 1,
@@ -149,7 +129,7 @@ tent_inside(RowNum, ColNum, TentRow-TentCol) :-
 sator_szukites(Trees, SpecialTreeIndex, TreesDirLists, ShrunkLists) :-
     ValidIndex is SpecialTreeIndex - 1,
     nth0(ValidIndex, TreesDirLists, DirForIndexedTree),
-    check_nth_element(DirForIndexedTree),
+    check_length_one(DirForIndexedTree),
     nth0(ValidIndex, Trees, Tree),
     [Dir|_] = DirForIndexedTree,
     create_tent(Tree, Dir, Tent),
@@ -160,36 +140,50 @@ sator_szukites(Trees, SpecialTreeIndex, TreesDirLists, ShrunkLists) :-
         ShrunkLists = []
     ).
 
-check_nth_element([_X|[]]).
-
-%check_nth_element(List) :-
-%    length(List, Length), Length == 1.
+check_length_one([_X|[]]).
 
 magic(Tent, Tree, Trees, TreesDirLists, ShrunkLists) :-
     collect_coords(Tent, Coords, 0),
     CheckingCoords = [Tent|Coords],
-    ShrunkLists = ReturnedLists,
-    shrunk_lists(CheckingCoords, Tree, Trees, TreesDirLists, ReturnedLists).
+    shrunk_lists(CheckingCoords, Tent, Tree, Trees, TreesDirLists, ShrunkLists).
 
-shrunk_lists(CheckingCoords, SelectedTree, [HeadTree|TailTrees], [HeadTreeDirsList|TailTreeDirsLists], ReturnedLists) :-
-    (SelectedTree == HeadTree -> 
-        ReturnedLists = [HeadTreeDirsList|NewReturnedLists],
-        shrunk_lists(CheckingCoords, SelectedTree, TailTrees, TailTreeDirsLists, NewReturnedLists)
-    ;
-        ReturnedLists = [Sorted|NewReturnedLists],
-        new_dirs_tree(CheckingCoords, HeadTree, HeadTreeDirsList, NewDirList),
-        sort(NewDirList, Sorted),
-        shrunk_lists(CheckingCoords, SelectedTree, TailTrees, TailTreeDirsLists, NewReturnedLists)
-    ).
+shrunk_lists(CheckingCoords, Tent, SelectedTree, [HeadTree|TailTrees], [HeadTreeDirsList|TailTreeDirsLists], ReturnedLists) :-
+    (below_current(Tent, HeadTree) -> 
+    	ReturnedLists = [HeadTreeDirsList|TailTreeDirsLists]
+    ;   
+    	(SelectedTree == HeadTree -> 
+          	ReturnedLists = [HeadTreeDirsList|NewReturnedLists],
+          	shrunk_lists(CheckingCoords, Tent, SelectedTree, TailTrees, TailTreeDirsLists, NewReturnedLists)
+        ;
+        	(in_distance(Tent, HeadTree) -> 
+                new_dirs_tree(CheckingCoords, HeadTree, HeadTreeDirsList, NewDirList),
+                ReturnedLists = [NewDirList|NewReturnedLists],
+                shrunk_lists(CheckingCoords, Tent, SelectedTree, TailTrees, TailTreeDirsLists, NewReturnedLists)
+            ;
+                ReturnedLists = [HeadTreeDirsList|NewReturnedLists],
+                shrunk_lists(CheckingCoords, Tent, SelectedTree, TailTrees, TailTreeDirsLists, NewReturnedLists)
+            )
+        )
+	).
 
-shrunk_lists(_, _, [], [], ReturnedLists) :-
+shrunk_lists(_, _, _, [], [], ReturnedLists) :-
     ReturnedLists = [].
+
+below_current(STreetX-_, CTreeX-_) :-
+    HorizontalDist is CTreeX - STreetX,
+    HorizontalDist >= 3.
+
+in_distance(STentX-STentY, CTreeX-CTreeY) :-
+    HorizontalDist is STentX-CTreeX,
+    VerticalDist is STentY-CTreeY,
+    HorizontalAbs is abs(HorizontalDist),
+    VerticalAbs is abs(VerticalDist),
+    ((HorizontalAbs =< 2 , VerticalAbs =< 1) ; (HorizontalAbs =< 1 , VerticalAbs =< 2)), !.
 
 new_dirs_tree(CheckingCoords, Tree, [HeadDir|TailDirs], DirList) :-
     create_tent(Tree, HeadDir, Tent),
     (memberchk(Tent, CheckingCoords) ->
-        DirList = NewDirList,
-        new_dirs_tree(CheckingCoords, Tree, TailDirs, NewDirList)
+        new_dirs_tree(CheckingCoords, Tree, TailDirs, DirList)
     ;
         DirList = [HeadDir|NewDirList],
         new_dirs_tree(CheckingCoords, Tree, TailDirs, NewDirList)
@@ -197,7 +191,6 @@ new_dirs_tree(CheckingCoords, Tree, [HeadDir|TailDirs], DirList) :-
 
 new_dirs_tree(_, _, [], NewDirList) :-
     NewDirList = [].
-
 
 collect_coords(Tent, Coords, Index) :-
     coord_by_index(Tent, Index, Coord),
@@ -208,15 +201,14 @@ collect_coords(Tent, Coords, Index) :-
 collect_coords(_, NewCoords, 8) :-
     NewCoords = [].
 
-coord_by_index(TentX-TentY, Index, Coord) :- 
-    (Index == 0 , NewX is TentX + 1 , Coord = NewX-TentY); /* middle bottom */
-    (Index == 1 , NewX is TentX - 1 , Coord = NewX-TentY); /* middle top */
-    (Index == 2 , NewY is TentY + 1 , Coord = TentX-NewY); /* middle right */
-    (Index == 3 , NewY is TentY - 1 , Coord = TentX-NewY); /* middle left */
-    (Index == 4 , NewX is TentX + 1 , NewY is TentY + 1 , Coord = NewX-NewY); /* corner bottom right */
-    (Index == 5 , NewX is TentX + 1 , NewY is TentY - 1 , Coord = NewX-NewY); /* corner bottom left */
-    (Index == 6 , NewX is TentX - 1 , NewY is TentY + 1 , Coord = NewX-NewY); /* corner top right */
-    (Index == 7 , NewX is TentX - 1 , NewY is TentY - 1 , Coord = NewX-NewY). /* corner top left */
+coord_by_index(X-Y, 0, NewX-Y) :- NewX is X + 1. /* middle bottom */
+coord_by_index(X-Y, 1, NewX-Y) :- NewX is X - 1. /* middle top */
+coord_by_index(X-Y, 2, X-NewY) :- NewY is Y + 1. /* middle right */
+coord_by_index(X-Y, 3, X-NewY) :- NewY is Y - 1. /* middle left */
+coord_by_index(X-Y, 4, NewX-NewY) :- NewX is X + 1, NewY is Y + 1. /* corner bottom right */
+coord_by_index(X-Y, 5, NewX-NewY) :- NewX is X + 1, NewY is Y - 1. /* corner bottom left */
+coord_by_index(X-Y, 6, NewX-NewY) :- NewX is X - 1, NewY is Y + 1. /* corner top right */
+coord_by_index(X-Y, 7, NewX-NewY) :- NewX is X - 1, NewY is Y - 1. /* corner top left */
 
 /* osszeg_szukites */
 
@@ -425,58 +417,36 @@ check_tree_perhaps_row(Tree, RowCount, Dirs) :-
     create_tents(Tree, Dirs, Tents),
     \+no_collision_tent_row(Tents, RowCount).
 
-get_sure_trees([HeadTree|TailTrees], oszl(ColCount, ColNum), [HeadTreeDirs|TailTreeDirs], Sures) :-
-    (check_tree_sure_col(HeadTree, ColCount, HeadTreeDirs) ->
-        Sures = [HeadTree|Ret],
-        get_sure_trees(TailTrees, oszl(ColCount, ColNum), TailTreeDirs, Ret)
+get_sure_trees([HeadTree|TailTrees], LineLimit, [HeadTreeDirs|TailTreeDirs], SureTrees) :-
+    length(HeadTreeDirs, Length), 
+    ((Length =< 2 , tents_are_right(HeadTree, LineLimit, HeadTreeDirs)) ->
+        SureTrees = [HeadTree|Return],
+        get_sure_trees(TailTrees, LineLimit, TailTreeDirs, Return)
     ;
-        get_sure_trees(TailTrees, oszl(ColCount, ColNum), TailTreeDirs, Sures)
+        get_sure_trees(TailTrees, LineLimit, TailTreeDirs, SureTrees)
     ).
 
-get_sure_trees([HeadTree|TailTrees], sor(RowCount, RowNum), [HeadTreeDirs|TailTreeDirs], Sures) :-
-    (check_tree_sure_row(HeadTree, RowCount, HeadTreeDirs) ->
-        Sures = [HeadTree|Ret],
-        get_sure_trees(TailTrees, sor(RowCount, RowNum), TailTreeDirs, Ret)
-    ;
-        get_sure_trees(TailTrees, sor(RowCount, RowNum), TailTreeDirs, Sures)
-    ).
+get_sure_trees([], _, [], SureTrees) :-
+    SureTrees = [].
 
-get_sure_trees([], _, [], Sures) :-
-    Sures = [].
-
-check_tree_sure_col(Tree, ColCount, Dirs) :-
+/*check_tree_for_sure(Tree, LineLimit, Dirs) :-
     length(Dirs, Length),
     Length =< 2,
-    tents_are_right_col(Tree, ColCount, Dirs).
+    tents_are_right(Tree, LineLimit, Dirs).*/
 
-tents_are_right_col(Tree, ColCount, [HeadDir|TailDirs]) :-
-    create_tent(Tree, HeadDir, Tent),
-    _-TentCol = Tent,
-    TentCol == ColCount,
-    tents_are_right_col(Tree, ColCount, TailDirs).
-
-tents_are_right_col(_, _, []) :-
-    true.
-
-check_tree_sure_row(Tree, RowCount, Dirs) :-
-    length(Dirs, Length),
-    Length =< 2,
-    tents_are_right_row(Tree, RowCount, Dirs).
-
-tents_are_right_row(Tree, RowCount, [HeadDir|TailDirs]) :-
+tents_are_right(Tree, sor(Index, _), [HeadDir|TailDirs]) :-
     create_tent(Tree, HeadDir, Tent),
     TentRow-_ = Tent,
-    TentRow = RowCount,
-    tents_are_right_row(Tree, RowCount, TailDirs).
+    TentRow == Index,
+    tents_are_right(Tree, sor(Index, _), TailDirs).
 
-tents_are_right_row(_, _, []) :-
-    true.
+tents_are_right(Tree, oszl(Index, _), [HeadDir|TailDirs]) :-
+    create_tent(Tree, HeadDir, Tent),
+    _-TentCol = Tent,
+    TentCol == Index,
+    tents_are_right(Tree, oszl(Index, _), TailDirs).
 
-/*create_tent(TreeRow-TreeCol, Dir, Tent) :-
-    (Dir == n , NewRow is TreeRow - 1 , NewRow-TreeCol = Tent);
-    (Dir == s , NewRow is TreeRow + 1 , NewRow-TreeCol = Tent);
-    (Dir == w , NewCol is TreeCol - 1 , TreeRow-NewCol = Tent);
-    (Dir == e , NewCol is TreeCol + 1 , TreeRow-NewCol = Tent).*/
+tents_are_right(_, _, []) :- true.
 
 create_tent(TreeRow-TreeCol, n, Tent) :- NewRow is TreeRow - 1, NewRow-TreeCol = Tent.
 create_tent(TreeRow-TreeCol, s, Tent) :- NewRow is TreeRow + 1, NewRow-TreeCol = Tent.
@@ -486,7 +456,3 @@ create_tent(TreeRow-TreeCol, w, Tent) :- NewCol is TreeCol - 1, TreeRow-NewCol =
 flatten([], []).
 flatten([[H]|T], [H|Tail]) :-
     flatten(T, Tail).
-
-
-
-
